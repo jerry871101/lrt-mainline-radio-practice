@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
-<title>淡海機廠調車無線電練習</title>
+<title>淡海輕軌正線無線電練習</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
@@ -14,689 +14,566 @@
     line-height: 1.65;
     padding: 12px;
     font-size: 15px;
+    padding-top: 310px; /* 為固定置頂 CMS 預留空間 */
   }
-  h1 {
-    font-size: 19px;
-    margin: 6px 0 14px;
-    text-align: center;
-    color: #60a5fa;
-  }
-  .card {
-    background: #1e293b;
-    border-radius: 10px;
-    padding: 14px;
-    margin-bottom: 12px;
-    border: 1px solid #334155;
-  }
-  .card h2 {
-    font-size: 15px;
-    margin: 0 0 10px;
-    color: #93c5fd;
-    border-bottom: 1px solid #334155;
-    padding-bottom: 6px;
-  }
-  label {
-    display: block;
-    font-size: 13px;
-    color: #94a3b8;
-    margin-bottom: 4px;
-  }
-  select, button, input {
-    width: 100%;
-    padding: 10px 12px;
-    font-size: 15px;
-    border-radius: 8px;
-    border: 1px solid #475569;
-    background: #0f172a;
-    color: #e2e8f0;
-    margin-bottom: 10px;
-    font-family: inherit;
-  }
-  button {
-    background: #2563eb;
-    border-color: #2563eb;
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-    padding: 13px;
-    font-size: 16px;
-  }
+  h1 { font-size: 19px; margin: 6px 0 14px; text-align: center; color: #60a5fa; }
+  .card { background: #1e293b; border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #334155; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; color: #93c5fd; border-bottom: 1px solid #334155; padding-bottom: 6px; }
+  label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 4px; }
+  select, button, input { width: 100%; padding: 10px 12px; font-size: 15px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; margin-bottom: 10px; font-family: inherit; }
+  button { background: #2563eb; border-color: #2563eb; color: white; font-weight: bold; cursor: pointer; padding: 13px; font-size: 16px; }
   button:active { background: #1d4ed8; }
   button:disabled { background: #475569; border-color: #475569; opacity: 0.6; cursor: not-allowed; }
   button.secondary { background: #475569; border-color: #475569; }
   .row { display: flex; gap: 8px; }
   .row > * { flex: 1; }
-  .chunk {
-    background: #0f172a;
-    border-left: 3px solid #3b82f6;
-    border-radius: 6px;
-    padding: 12px;
-    margin-bottom: 12px;
+
+  /* CMS 核心樣式 */
+  .cms-area {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
+    background: #000; border-bottom: 4px solid #475569; padding: 12px; height: 300px;
+    display: flex; flex-direction: column; gap: 8px; font-family: "Consolas", monospace;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.9);
   }
+  .cms-screen { flex: 1; background: #000; border: 1px solid #334155; border-radius: 4px; position: relative; overflow: hidden; }
+  .cms-page { display: none; height: 100%; padding: 10px; }
+  .cms-page.active { display: block; }
+  
+  .cms-nav-container { display: flex; flex-direction: column; gap: 4px; }
+  .cms-sub-nav {
+    display: none; grid-template-columns: repeat(4, 1fr); gap: 4px; background: #111827;
+    padding: 4px; border-radius: 4px; border: 1px solid #334155;
+  }
+  .cms-sub-nav.active { display: grid; }
+  
+  .cms-main-nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .nav-btn {
+    background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+    color: #94a3b8; border: 2px solid #475569; padding: 10px 2px;
+    font-size: 13px; text-align: center; cursor: pointer; border-radius: 6px; font-weight: bold;
+    box-shadow: 0 3px 0 #000, inset 0 1px 0 rgba(255,255,255,0.1);
+    transition: all 0.05s; user-select: none; display: flex; align-items: center; justify-content: center;
+  }
+  .nav-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #000; background: #0f172a; }
+  .nav-btn.active { background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%); color: white; border-color: #60a5fa; box-shadow: 0 1px 0 #000, inset 0 1px 3px rgba(0,0,0,0.5); }
+  .nav-btn.alert { animation: blink-yellow 1s infinite; color: #fbbf24; border-color: #fbbf24; }
+  
+  .sub-nav-btn {
+    background: linear-gradient(180deg, #475569 0%, #334155 100%); color: #e2e8f0; border: 1px solid #64748b; padding: 8px 2px;
+    font-size: 11px; text-align: center; cursor: pointer; border-radius: 4px; box-shadow: 0 2px 0 #000; transition: all 0.05s; user-select: none;
+  }
+  .sub-nav-btn:active { transform: translateY(2px); box-shadow: 0 0 0 #000; }
+  .sub-nav-btn.active { background: #1e3a8a; border-color: #3b82f6; box-shadow: inset 0 2px 4px rgba(0,0,0,0.6); }
+
+  .cms-page button, .cms-page .sub-btn {
+    background: linear-gradient(180deg, #334155 0%, #1e293b 100%); border: 2px solid #475569; color: #f1f5f9; padding: 10px;
+    border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; box-shadow: 0 3px 0 #000; transition: all 0.05s;
+    width: auto; min-width: 100px; margin-bottom: 5px; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .cms-page button:active, .cms-page .sub-btn:active { transform: translateY(3px); box-shadow: 0 0 0 #000; }
+  .cms-page button.secondary { background: #1e293b; color: #94a3b8; border-color: #334155; }
+  .sub-btn.highlight { border-color: #fbbf24 !important; color: #fbbf24 !important; box-shadow: 0 0 10px #78350f !important; animation: blink-yellow-light 1s infinite !important; }
+  @keyframes blink-yellow-light { 50% { opacity: 0.7; border-color: #f59e0b; } }
+
+  .cms-layout { display: grid; grid-template-columns: 1fr 140px; gap: 15px; height: 100%; }
+  .cms-gear-display { width: 60px; height: 60px; background: #000; border: 3px solid #475569; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; color: #4ade80; border-radius: 8px; }
+  .cms-gear-display.fault { color: #ef4444; border-color: #ef4444; }
+  .atp-hmi { width: 100px; height: 75px; background: #064e3b; border: 2px solid #334155; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; }
+  .atp-hmi.fault { background: #7f1d1d; }
+  .atp-limit { font-size: 36px; font-weight: bold; }
+  .cms-icon { width: 45px; height: 45px; border: 2px solid #334155; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; border-radius: 6px; }
+  .cms-icon.active-t { color: #4ade80; border-color: #4ade80; }
+  .cms-icon.inactive { color: #1e293b; border-color: #1e293b; }
+  .cms-icon.fault { color: #ef4444; border-color: #ef4444; animation: blink 1s infinite; }
+  .door-box { height: 14px; background: #1e293b; border: 1px solid #334155; }
+  .door-box.open { background: #3b82f6; }
+  .door-box.offline { background: #4b5563; position: relative; }
+  .door-box.offline::after { content: "×"; color: #fff; position: absolute; top: -4px; left: 2px; font-size: 12px; }
+  @keyframes blink { 50% { opacity: 0.3; } }
+  @keyframes blink-yellow { 50% { background: #78350f; } }
+  .emergency-panel { background: #450a0a; border: 2px solid #991b1b; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
+  .em-btn { background: #7f1d1d; color: #fff; border: 2px solid #dc2626; padding: 12px; font-size: 14px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; }
+  .em-btn.highlight { background: #ef4444; box-shadow: 0 0 15px #ef4444; }
+  .chunk { background: #0f172a; border-left: 3px solid #3b82f6; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
   .chunk.final { border-left-color: #10b981; }
-  .chunk-title {
-    font-size: 13px;
-    color: #fbbf24;
-    font-weight: bold;
-    margin-bottom: 8px;
-  }
-  .line {
-    padding: 6px 0 6px 56px;
-    position: relative;
-    border-top: 1px dashed #334155;
-  }
-  .line:first-of-type { border-top: none; }
-  .line .who {
-    position: absolute;
-    left: 0;
-    top: 6px;
-    font-weight: bold;
-    width: 52px;
-    font-size: 13px;
-  }
+  .chunk-title { font-size: 13px; color: #fbbf24; font-weight: bold; margin-bottom: 8px; }
+  .line { padding: 6px 0 6px 56px; position: relative; border-top: 1px dashed #334155; }
+  .line .who { position: absolute; left: 0; top: 6px; font-weight: bold; width: 52px; font-size: 13px; }
   .line.driver .who { color: #60a5fa; }
   .line.occ .who { color: #fb923c; }
-  .line .text { font-size: 14.5px; }
-  .hint {
-    background: #422006;
-    border-left: 3px solid #f59e0b;
-    padding: 8px 10px;
-    margin-top: 8px;
-    font-size: 13px;
-    border-radius: 4px;
-    color: #fed7aa;
-  }
-  .error {
-    background: #450a0a;
-    border: 1px solid #dc2626;
-    color: #fecaca;
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 12px;
-  }
-  .small { font-size: 12px; color: #94a3b8; }
-  .progress {
-    font-size: 13px;
-    color: #94a3b8;
-    margin-bottom: 8px;
-    text-align: center;
-  }
+  .bogie-unit { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #334155; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; }
+  .bogie-unit.selected { border-color: #3b82f6; background: #1d4ed8; color: white; }
+  .bogie-unit.isolated { border-color: #fbbf24; background: #78350f; color: #fbbf24; }
+  .progress { font-size: 13px; color: #94a3b8; margin-bottom: 8px; text-align: center; }
 </style>
 </head>
 <body>
 
-<h1>淡海機廠調車無線電練習</h1>
-
-<div class="card">
-  <h2>① 機廠架空線狀態</h2>
-  <select id="powerState">
-    <option value="normal">正常（A、B 區皆有電）</option>
-    <option value="A_off">A 區斷電（TK201+TK202）</option>
-    <option value="B_off">B 區斷電（TK203+TK204）</option>
-    <option value="all_off">全區斷電</option>
-  </select>
-</div>
-
-<div class="card">
-  <h2>② 車號與起訖點</h2>
-  <label>車號</label>
-  <input id="trainId" type="text" value="101" maxlength="4" inputmode="numeric">
-  <div class="row">
-    <div>
-      <label>起點（大區）</label>
-      <select id="fromArea"></select>
+<div id="cms" class="cms-area">
+  <div class="cms-screen">
+    <div id="p-home" class="cms-page active">
+      <div class="cms-layout">
+        <div class="cms-main" style="display: flex; gap: 15px; align-items: center;">
+          <div style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: #94a3b8; min-width: 80px; border-right: 1px solid #334155; padding-right: 10px;">
+            <span id="cms-time">08:00:00</span>
+            <span style="color: #4ade80; font-weight: bold; font-size: 16px;">0 <small>km/h</small></span>
+            <span id="cms-train-num" style="color: #fff;">101</span>
+          </div>
+          <div id="cms-gear" class="cms-gear-display">HB</div>
+          <div style="display: grid; grid-template-columns: 1fr; gap: 6px;">
+            <div id="cms-t" class="cms-icon active-t">T</div>
+            <div id="cms-p" class="cms-icon active-t">弓</div>
+          </div>
+          <div id="atp-hmi" class="atp-hmi">
+            <div id="atp-limit" class="atp-limit">20</div>
+            <div style="font-size: 11px;">ATP V-MAX</div>
+          </div>
+          <div id="btn-mirror-reset" class="nav-btn" style="width: 100px; padding: 4px; font-size: 11px;" onclick="handleCMSClick('後視鏡重置')">後視鏡重置</div>
+        </div>
+        <div class="cms-train-col" style="border: 1px solid #334155; padding: 6px; background: #111827; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <!-- 重新設計的 5 節車廂圖示 -->
+          <div id="train-graphic" style="position: relative; width: 120px; height: 230px; background: #000; border: 2px solid #475569; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 12px;">
+            <!-- M1 (Motor) -->
+            <div class="train-car" style="height: 42px; border: 1px solid #64748b; position: relative; border-radius: 10px 10px 4px 4px; background: #1e293b;">
+              <div id="t-m1-1" class="cms-icon active-t" style="position: absolute; top: 2px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; font-size: 9px; border-width: 1px;">T</div>
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: bold; color: #fff;">M1</div>
+              <div id="t-m1-2" class="cms-icon active-t" style="position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; font-size: 9px; border-width: 1px;">T</div>
+              <div class="door-box" id="d-m1l" style="position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 8px; height: 16px;"></div>
+              <div class="door-box" id="d-m1r" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 8px; height: 16px;"></div>
+              <div id="bogie-status-m1" style="position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #ef4444; font-weight: bold; font-size: 10px; background: #000; padding: 0 2px;"></div>
+            </div>
+            <!-- M2 (Trailer w/ Doors) -->
+            <div class="train-car" style="height: 40px; border: 1px solid #64748b; position: relative; border-radius: 4px; background: #1e293b;">
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: bold; color: #fff;">M2</div>
+              <div class="door-box" id="d-m2l" style="position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 8px; height: 16px;"></div>
+              <div class="door-box" id="d-m2r" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 8px; height: 16px;"></div>
+            </div>
+            <!-- M3 (Trailer Bogie, No Doors) -->
+            <div class="train-car" style="height: 38px; border: 1px solid #475569; position: relative; border-radius: 4px; background: #0f172a; border-style: dashed;">
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: bold; color: #64748b;">M3</div>
+              <div id="bogie-status-m3" style="position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #ef4444; font-weight: bold; font-size: 10px; background: #000; padding: 0 2px;"></div>
+            </div>
+            <!-- M4 (Trailer w/ Doors) -->
+            <div class="train-car" style="height: 40px; border: 1px solid #64748b; position: relative; border-radius: 4px; background: #1e293b;">
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: bold; color: #fff;">M4</div>
+              <div class="door-box" id="d-m4l" style="position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 8px; height: 16px;"></div>
+              <div class="door-box" id="d-m4r" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 8px; height: 16px;"></div>
+            </div>
+            <!-- M5 (Motor) -->
+            <div class="train-car" style="height: 42px; border: 1px solid #64748b; position: relative; border-radius: 4px 4px 10px 10px; background: #1e293b;">
+              <div id="t-m5-1" class="cms-icon active-t" style="position: absolute; top: 2px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; font-size: 9px; border-width: 1px;">T</div>
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: bold; color: #fff;">M5</div>
+              <div id="t-m5-2" class="cms-icon active-t" style="position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; font-size: 9px; border-width: 1px;">T</div>
+              <div class="door-box" id="d-m5l" style="position: absolute; left: 4px; top: 50%; transform: translateY(-50%); width: 8px; height: 16px;"></div>
+              <div class="door-box" id="d-m5r" style="position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 8px; height: 16px;"></div>
+              <div id="bogie-status-m5" style="position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #ef4444; font-weight: bold; font-size: 10px; background: #000; padding: 0 2px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div>
-      <label>起點（細項）</label>
-      <select id="fromDetail"></select>
+    <div id="p-settings" class="cms-page"><h3>設定 (SETTINGS)</h3><button style="width: 150px; font-size: 13px;">CMS 螢幕亮度</button></div>
+    <div id="p-monitor" class="cms-page"><h3>監視 (MONITOR)</h3><div class="row"><button class="secondary">TCMS</button><button class="secondary">電源</button><button class="secondary">容量</button></div></div>
+    <div id="p-propulsion" class="cms-page"><h3>控制 > 推進</h3><div class="row"><button id="btn-tcu-reset" style="background:#334155;" onclick="handleCMSClick('TCU錯誤復位')">TCU 錯誤復位</button><button id="btn-flange-lub" style="background:#334155;" onclick="toggleFlangeLub()">輪緣潤滑裝置</button></div></div>
+    <div id="p-ac" class="cms-page"><h3>控制 > 客室空調</h3><div class="row">
+        <button id="btn-ac-off" style="background:#475569;" onclick="toggleACOff()">空調關閉</button>
+        <button class="secondary">溫度設定</button>
+        <button id="btn-ac-reset" style="background:#334155;" onclick="handleCMSClick('空調重置')">空調重置</button>
+      </div></div>
+    <div id="p-door" class="cms-page"><h3>控制 > 車門</h3><div class="row"><button style="background:#475569">車門開啟</button><button style="background:#475569">車門關閉</button></div><div class="row"><button id="btn-door-all" style="background:#334155;" onclick="handleCMSClick('全開全關')">全開全關</button></div></div>
+    <div id="p-brake" class="cms-page"><h3>控制 > 煞車</h3>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 20px;">
+          <button class="secondary" style="min-width:60px;" onclick="cycleBogie(-1)">◀</button>
+          <div style="display: flex; gap: 10px;">
+            <div id="bogie-M1" class="bogie-unit selected">M1</div>
+            <div id="bogie-M3" class="bogie-unit">M3</div>
+            <div id="bogie-M5" class="bogie-unit">M5</div>
+          </div>
+          <button class="secondary" style="min-width:60px;" onclick="cycleBogie(1)">▶</button>
+        </div>
+        <button id="btn-bogie-isolate" style="width: 200px; background:#334155;" onclick="handleCMSClick('隔離轉向架')">隔離轉向架</button>
+      </div></div>
+    <div id="p-diag" class="cms-page"><h3>診斷 (DIAGNOSTICS)</h3><div id="diag-content" style="color:#ef4444; font-size: 14px; line-height: 1.4; font-weight: bold;">無主動故障紀錄</div></div>
+  </div>
+  <div class="cms-nav-container">
+    <div id="sub-nav-control" class="cms-sub-nav"><div id="btn-sub-propulsion" class="sub-nav-btn" onclick="switchCMSTab('propulsion')">推進</div><div id="btn-sub-ac" class="sub-nav-btn" onclick="switchCMSTab('ac')">空調</div><div id="btn-sub-door" class="sub-nav-btn" onclick="switchCMSTab('door')">車門</div><div id="btn-sub-brake" class="sub-nav-btn" onclick="switchCMSTab('brake')">煞車</div></div>
+    <div id="sub-nav-monitor" class="cms-sub-nav"><div class="sub-nav-btn">TCMS</div><div class="sub-nav-btn">電源</div><div class="sub-nav-btn">容量</div></div>
+    <div class="cms-main-nav">
+      <div class="nav-btn" onclick="toggleSubNav('settings')">設定</div>
+      <div id="nav-monitor" class="nav-btn" onclick="toggleSubNav('monitor')">監視</div>
+      <div id="nav-control" class="nav-btn" onclick="toggleSubNav('control')">控制</div>
+      <div id="nav-diag" class="nav-btn" onclick="switchCMSTab('diag')">診斷</div>
+      <div id="nav-home" class="nav-btn active" onclick="switchCMSTab('home')">首頁</div>
     </div>
   </div>
-  <div class="row">
-    <div>
-      <label>目的地（大區）</label>
-      <select id="toArea"></select>
-    </div>
-    <div>
-      <label>目的地（細項）</label>
-      <select id="toDetail"></select>
-    </div>
-  </div>
 </div>
 
-<button id="genBtn">產生調車程序</button>
-
-<div id="result"></div>
+<div class="main-content">
+  <h1>淡海輕軌正線無線電練習</h1>
+  <div id="emergency-panel" class="emergency-panel" style="display: none;">
+    <div style="color: #fca5a5; font-size: 12px; margin-bottom: 8px; font-weight: bold;">應急實體面板</div>
+    <div id="em-btns" class="em-btn-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;"></div>
+  </div>
+  <div class="card">
+    <h2>① 運轉設定</h2>
+    <div class="row">
+      <div><label>車號</label><input id="trainId" type="text" value="101" maxlength="4" inputmode="numeric"></div>
+      <div><label>練習情境</label><select id="scenario">
+        <option value="normal">正常運轉</option><option value="random_fault">隨機故障排除 (故排)</option><option value="clear">異常處理 (清車)</option><option value="delay_intersection">未能通過路口 (紅燈)</option>
+        <optgroup label="故障排除 (故排)">
+          <option value="fault_traction">牽引系統故障</option><option value="fault_brake">煞車系統故障</option><option value="fault_power">供電系統故障</option><option value="fault_door">車門系統故障</option><option value="fault_speed">輔助速限裝置故障</option><option value="fault_ac">空調系統故障</option><option value="fault_restart">清車重開機</option>
+        </optgroup>
+        <optgroup label="營運情境">
+          <option value="scenario_point">轉轍器手動扳轉</option><option value="scenario_pei">PEI 旅客對講機</option>
+        </optgroup></select></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>② 起訖車站</h2>
+    <div class="row"><select id="fromArea"></select><select id="fromDetail"></select></div>
+    <div class="row"><select id="toArea"></select><select id="toDetail"></select></div>
+    <select id="endAction"><option value="continue">換端後繼續發車</option><option value="finish">換端後返回車班</option></select>
+  </div>
+  <button id="genBtn">產生正線運轉程序</button>
+  <div id="result"></div>
+</div>
 
 <script>
-/* ================== 地點資料 ================== */
 const AREAS = {
-  park:   { label: "駐車區", items: [
-    "P1/1","P1/2","P1/3","P1/4",
-    "P2/1","P2/2","P2/3","P2/4",
-    "P3/1","P3/2","P3/3","P3/4",
-    "P4/1","P4/2","P4/3","P4/4"
-  ]},
-  maint:  { label: "維修工廠", items: ["TK101","TK102","TK103","TK104","TK105","TK106","TK107"] },
-  trans:  { label: "轉換軌", items: ["轉換軌上行","轉換軌下行"] },
-  wash:   { label: "洗車軌", items: ["TK301"] },
-  main:   { label: "正線（出機廠）", items: ["正線上行（往 V11 一月台）","正線下行（往 V11 二月台）"] }
+  mainline: { label: "正線站點", items: ["臨時駐車位置 1-0", "臨時駐車位置 2-0", "V11 1月台", "V11 2月台", "V01 1月台", "V01 2月台", "V26 1月台", "V26 2月台"]},
+  green: { label: "綠山線", items: ["V01 1月台", "V01 2月台", "V02 1月台", "V02 2月台", "V03 1月台", "V03 2月台", "V04 1月台", "V04 2月台", "V05 1月台", "V05 2月台", "V06 1月台", "V06 2月台", "V07 1月台", "V07 2月台", "V08 1月台", "V08 2月台", "V09 1月台", "V09 2月台", "V10 1月台", "V10 2月台", "V11 1月台", "V11 2月台"]},
+  blue: { label: "藍海線", items: ["V26 1月台", "V26 2月台", "V27 1月台", "V27 2月台", "V28 1月台", "V28 2月台"]},
+  intersections: { label: "路口", items: Array.from({length:18}, (_,i)=>`J${String(i+1).padStart(2,'0')}`)},
+  depot: { label: "機廠", items: ["臨時駐車位置 1-0", "臨時駐車位置 2-0", "轉換軌上行 (I405)", "轉換軌下行 (I406)"] }
 };
-const FROM_AREAS = ["park","maint","trans","wash"];
-const TO_AREAS   = ["park","maint","trans","wash","main"];
+const ROUTES_MAP = { "V11 2月台-V01 2月台": "11901", "V11 1月台-V01 2月台": "11702", "V01 2月台-V26 1月台": "10601", "V26 1月台-V01 1月台": "10003", "V01 1月台-V11 2月台": "12101", "V01 1月台-V26 1月台": "10401", "V01 1月台-V26 2月台": "10501", "V26 2月台-V01 1月台": "10201", "V26 2月台-V01 2月台": "10301", "V11 1月台-V01 1月台": "11603", "V11 2月台-V01 1月台": "11801", "V01 2月台-V11 1月台": "12201", "V01 2月台-V11 2月台": "12306", "V01 2月台-V26 2月台": "10704", "V26 1月台-V09 2月台": "10101", "V09 2月台-V11 2月台": "12801", "V26 2月台-V09 2月台": "10301" };
 
-/* ================== 工具 ================== */
-function parkZone(pos) { return (pos[1]==="1"||pos[1]==="2") ? "A" : "B"; }
-function isNoPower(area, detail, power) {
-  if (area==="maint") return true;
-  if (area==="park") {
-    if (detail==="P1/1") return true;
-    const z = parkZone(detail);
-    if (power==="all_off") return true;
-    if (power==="A_off" && z==="A") return true;
-    if (power==="B_off" && z==="B") return true;
+const FAULT_DATA = {
+  fault_traction: { name: "牽引系統故障", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "列車發生牽引系統故障，CMS顯示T字燈號消失，目前無法移動" },
+    { type: "emergency", action: "列車自動保護 Bypass", report: "TCU復位無效，確認ATP無異常，列車仍無法移動" },
+    { type: "final", report: "已完成按壓應急按鈕「列車自動保護 Bypass」，高架段已切換機廠模式，確認列車可移動。請問OCC是否各站無旅客上下車立即發車，直到時刻表回復準點為止" }
+  ]},
+  fault_brake: { name: "煞車系統故障", steps: [
+    { type: "cms", action: "隔離轉向架", report: "CMS顯示E1煞車故障，轉向架出現ERR標籤，目前無法移動" },
+    { type: "emergency", action: "煞車解除", report: "已完成CMS「隔離轉向架」作業，確認黃燈亮起，列車仍無法移動" },
+    { type: "final", report: "已完成「隔離轉向架」並按壓應急按鈕「煞車解除」，確認列車可移動。請問OCC是否行駛至端點站清車換車" }
+  ]},
+  fault_power: { name: "供電系統故障", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "列車發生供電系統故障，CMS顯示集電弓圖示異常，目前無法移動" },
+    { type: "emergency", action: "集電弓降弓 HV OFF", report: "TCU復位無效，手動升降弓一次確認無效，請求授權切換ESS模式" },
+    { type: "final", report: "已按壓應急按鈕「集電弓降弓 HV OFF」並完成切換ESS模式，確認列車可移動。請問OCC是否執行清車作業並收車回機廠" }
+  ]},
+  fault_door: { name: "車門系統故障", steps: [
+    { type: "cms", action: "全開全關", report: "列車發生車門系統故障，車門無法關閉" },
+    { type: "emergency", action: "上下車門", report: "CMS全開全關作業無效，至現場確認車門仍無法手動關閉" },
+    { type: "final", report: "已按壓應急按鈕「上下車門」並完成故障車門隔離。請問OCC是否准許發車，行駛至下站後再行清車" }
+  ]},
+  fault_speed: { name: "輔助速限裝置故障", steps: [
+    { type: "emergency", action: "ATP重置", report: "列車發生輔助速限裝置故障，ATP顯示E3516，目前無法移動" },
+    { type: "emergency", action: "列車自動保護 Bypass", report: "ATP重置無效，已執行Key Off/Key On，列車仍無法移動" },
+    { type: "final", report: "已完成按壓應急按鈕「列車自動保護 Bypass」，高架段已切換機廠模式，確認列車可移動。請問OCC是否收車回機廠" }
+  ]},
+  fault_ac: { name: "空調系統故障", steps: [
+    { type: "cms", action: "空調重置", report: "列車發生空調系統故障，客室溫度偏高，CMS空調頁面顯示異常" },
+    { type: "final", report: "已完成CMS「空調重置」作業，確認空調系統已恢復正常。請問OCC是否持續觀察行駛至端點站" }
+  ]},
+  fault_restart: { name: "清車重開機", steps: [
+    { type: "emergency", action: "降級模式", report: "列車多項系統異常，請求執行清車重開機作業" },
+    { type: "final", report: "已完成清車並執行重開機作業，系統恢復正常。請問OCC是否准許跳站發車，直到時刻表回復準點為止" }
+  ]}
+};
+
+let pendingAction = null; let currentChunks = []; let revealed = 0;
+let completedActions = new Set(); 
+let currentBogieIdx = 0; // 0:M1, 1:M3, 2:M5
+let isACOff = false;
+let isFlangeLubOn = false;
+let persistentFault = { bogie: null, tag: null, tIndex: null };
+
+function resetFaultState() {
+  persistentFault = { bogie: null, tag: null, tIndex: null };
+}
+
+function toggleACOff() {
+  isACOff = !isACOff;
+  const btn = document.getElementById('btn-ac-off');
+  btn.style.background = isACOff ? '#3b82f6' : '#475569';
+}
+
+function toggleFlangeLub() {
+  isFlangeLubOn = !isFlangeLubOn;
+  const btn = document.getElementById('btn-flange-lub');
+  btn.style.background = isFlangeLubOn ? '#3b82f6' : '#334155';
+}
+
+function cycleBogie(dir) {
+  currentBogieIdx = (currentBogieIdx + dir + 3) % 3;
+  const bogies = ['M1', 'M3', 'M5'];
+  bogies.forEach((b, i) => {
+    const el = document.getElementById('bogie-' + b);
+    el.classList.remove('selected');
+    if (i === currentBogieIdx) el.classList.add('selected');
+  });
+}
+
+function toggleSubNav(mainTab) {
+  const subNavs = document.querySelectorAll('.cms-sub-nav');
+  const mainBtns = document.querySelectorAll('.cms-main-nav .nav-btn');
+  subNavs.forEach(s => s.classList.remove('active'));
+  mainBtns.forEach(b => b.classList.remove('active'));
+  const targetSub = document.getElementById(`sub-nav-${mainTab}`);
+  if (targetSub) { targetSub.classList.add('active'); const btn = Array.from(mainBtns).find(b => b.innerText.includes(mainTab==='control'?'控制':'監視')); if(btn) btn.classList.add('active'); }
+  else { switchCMSTab(mainTab); }
+}
+
+function switchCMSTab(tab) {
+  const pages = document.querySelectorAll('.cms-page');
+  const mainBtns = document.querySelectorAll('.cms-main-nav .nav-btn');
+  const subBtns = document.querySelectorAll('.sub-nav-btn');
+  pages.forEach(p => p.classList.remove('active'));
+  const targetPage = document.getElementById(`p-${tab}`); if(targetPage) targetPage.classList.add('active');
+  const ctrlTabs = ['propulsion', 'ac', 'door', 'brake'];
+  if (!ctrlTabs.includes(tab)) document.getElementById('sub-nav-control').classList.remove('active');
+  mainBtns.forEach(b => {
+    const map = { home:'首頁', settings:'設定', monitor:'監視', control:'控制', diag:'診斷' };
+    b.classList.remove('active'); if (b.innerText === map[tab] || (ctrlTabs.includes(tab) && b.innerText === '控制')) b.classList.add('active');
+  });
+  subBtns.forEach(b => {
+    const map = { propulsion:'推進', ac:'空調', door:'車門', brake:'煞車' };
+    b.classList.remove('active'); if (b.innerText === map[tab]) b.classList.add('active');
+  });
+}
+
+function updateCMSDisplay(scenario) {
+  const gear = document.getElementById("cms-gear");
+  const diag = document.getElementById("diag-content");
+  const navDiag = document.getElementById("nav-diag");
+  gear.innerText = "HB"; gear.className = "cms-gear-display";
+  document.getElementById("atp-hmi").className = "atp-hmi"; document.getElementById("atp-limit").innerText = "20";
+  ["cms-t","cms-p"].forEach(id => document.getElementById(id).className = "cms-icon active-t");
+  diag.innerText = "無主動故障紀錄"; navDiag.classList.remove('alert');
+  document.querySelectorAll(".door-box").forEach(box => box.className = "door-box");
+  document.querySelectorAll(".bogie-unit").forEach(u => u.classList.remove('isolated'));
+  
+  // 重置列車圖示狀態
+  ["t-m1-1","t-m1-2","t-m5-1","t-m5-2"].forEach(id => document.getElementById(id).className = "cms-icon active-t");
+  ["m1","m3","m5"].forEach(b => document.getElementById(`bogie-status-${b}`).innerText = "");
+
+  if (scenario === "fault_traction") { 
+    gear.innerText = "E1"; gear.className = "cms-gear-display fault";
+    document.getElementById("cms-t").className = "cms-icon fault"; 
+    document.getElementById("t-m1-1").className = "cms-icon inactive"; 
   }
-  return false;
-}
-function parkTK(pos) { return "TK20" + pos[1]; }  // P3/2 → TK203
-function randTrans() { return Math.random()<0.5 ? "轉換軌上行" : "轉換軌下行"; }
-function mainTrans(toD) { return toD.includes("上行") ? "轉換軌上行" : "轉換軌下行"; }
-function isTransLoc(s) { return s==="轉換軌上行" || s==="轉換軌下行"; }
-function pickTransitP4(power) {
-  const all = [];
-  if (power !== "all_off" && power !== "A_off") all.push("P1/4","P2/4");
-  if (power !== "all_off" && power !== "B_off") all.push("P3/4","P4/4");
-  if (all.length === 0) all.push("P3/4");
-  return all[Math.floor(Math.random()*all.length)];
-}
-function pickTransitParkTK(power) {
-  // 選一條有電的駐車軌 TK (做為維修出廠升弓的中繼)
-  const all = [];
-  if (power !== "all_off" && power !== "A_off") all.push("TK201","TK202");
-  if (power !== "all_off" && power !== "B_off") all.push("TK203","TK204");
-  if (all.length === 0) all.push("TK203");
-  return all[Math.floor(Math.random()*all.length)];
-}
-
-/* ================== 建立回報點序列 ================== */
-/*
-  回報點結構：
-  {
-    loc:     位置字串，用於「[loc]，[車號]呼叫OCC，...」
-    report:  抵達時回報內容（不含位置前綴與OVER，例如「已停妥P2/4」、「已完成車外車底巡視，做好動車前準備」）
-    extra:   附加回報（例如「雙端電池(80/80%)」、「電壓800V」），可選
-    nextMode: OCC下段指示模式（例如「洗車連結模式」、「ESS模式」、「機廠模式」、「洗車連結模式及機廠模式」）
-    nextLoc: OCC下段指示目的地
-    nextDo:  抵達後要做什麼（例如「升弓回報」、「投入ESS模式回報」、「停妥將列車關機」）
-    confirm: OCC要求確認的項目陣列，預設=["前方號誌開通","轉轍器方位正確","鄰軌無列車","軌道淨空"]
-    isFinal: 最後停妥點，無下段指令
-  }
-*/
-const DEFAULT_CONFIRM = ["前方號誌開通","轉轍器方位正確","鄰軌無列車","軌道淨空"];
-const STARTUP_CONFIRM = []; // 起始動車前準備無「確認」項
-const ENTER_MAINT_CONFIRM = ["前方鐵門開啟","軌道淨空"]; // 維修廠棚外進入維修軌時
-
-function buildPoints(fromA, fromD, toA, toD, power) {
-  const pts = [];
-  const noPowerStart = isNoPower(fromA, fromD, power);
-  const noPowerEnd = isNoPower(toA, toD, power);
-
-  /* ---------- 1. 起始點 ---------- */
-  if (fromA === "park") {
-    if (noPowerStart) {
-      // ESS 起始：兩階段
-      pts.push({
-        loc: fromD,
-        report: "已完成車外車底巡視，將進入列車開機投入ESS模式，做好動車前準備後回報",
-        confirm: STARTUP_CONFIRM,
-        nextMode: null, nextLoc: null,
-        nextDo: "完成動車前準備",
-        _occOnlyPrep: true
-      });
-      pts.push({
-        loc: fromD,
-        report: "已開機並完成動車前準備",
-        extra: "雙端電池(80/80%)"
-      });
-    } else {
-      pts.push({
-        loc: fromD,
-        report: "已完成車外車底巡視，做好動車前準備",
-        confirm: STARTUP_CONFIRM
-      });
+  else if (scenario === "fault_brake") { 
+    gear.innerText = "E1"; gear.className = "cms-gear-display fault";
+    document.getElementById("cms-t").className = "cms-icon fault"; 
+    // 持久化故障位置
+    if (!persistentFault.bogie) {
+      persistentFault.bogie = ["m1","m3","m5"][Math.floor(Math.random()*3)];
+      persistentFault.tag = Math.random() > 0.5 ? "ERR" : "SE";
     }
-  } else if (fromA === "maint") {
-    // 維修工廠起：開機必為 ESS
-    pts.push({
-      loc: fromD,
-      report: "已完成車外車底巡視，將進入列車開機投入ESS模式，做好動車前準備後回報",
-      confirm: STARTUP_CONFIRM,
-      _occOnlyPrep: true
-    });
-    pts.push({
-      loc: fromD,
-      report: "已開機並完成動車前準備",
-      extra: "雙端電池(80/80%)"
-    });
-  } else if (fromA === "trans") {
-    // 轉換軌起：由正線進入
-    // 目的地為洗車軌 → 於轉換軌切洗車連結模式（維持升弓）
-    // 其餘進機廠目的地 → 於轉換軌切機廠模式
-    const isToWash = (toA === "wash");
-    pts.push({
-      loc: fromD,
-      report: isToWash
-        ? `已停妥${fromD}，切換洗車連結模式及G01頻道完成`
-        : `已停妥${fromD}，切換機廠模式及G01頻道完成`
-    });
-  } else if (fromA === "wash") {
-    // 洗車軌起（洗車完畢後）
-    pts.push({
-      loc: "TK301",
-      report: "洗車作業已完畢"
-    });
-  }
-
-  /* ---------- 2. 路徑中繼點 ---------- */
-  // 2-1. 起點為駐車場且非 P_/4：須先行駛到 P_/4
-  if (fromA === "park" && fromD[3] !== "4") {
-    const pexit = `P${fromD[1]}/4`;
-    pts.push({
-      loc: pexit,
-      report: `已停妥${pexit}`
-    });
-  }
-
-  // 2-2. 起點為維修：不在維修棚外升弓（維修無架空線），改於駐車場棚外才升弓（見 3.5 / 2-3）
-
-  // 2-3. 維修 → 駐車場（直達）：目標駐車軌棚外（視目標是否有電決定是否升弓）
-  if (fromA === "maint" && toA === "park") {
-    const targetTK = parkTK(toD);
-    const targetNoPower = isNoPower("park", toD, power);
-    pts.push({
-      loc: `${targetTK}廠棚外`,
-      report: targetNoPower
-        ? `已停妥${targetTK}廠棚外，維持ESS模式`
-        : `已停妥${targetTK}廠棚外，升弓`,
-      extra: targetNoPower ? "雙端電池(80/80%)" : "電壓800V",
-      _maintToParkShed: true,
-      _targetNoPower: targetNoPower
-    });
-  }
-
-  /* ---------- 3. 判斷是否經轉換軌 ---------- */
-  // 直達（不經轉換軌）：駐車↔維修、駐車↔同側洗車軌出口（洗車→駐車亦直達）
-  const directParkMaint = (fromA==="park" && toA==="maint") || (fromA==="maint" && toA==="park");
-  const washToPark = (fromA==="wash" && toA==="park");
-  // 已在轉換軌就不需再加一個轉換軌中繼點
-  const alreadyOnTrans = (fromA === "trans");
-  // 維修↔維修 換軌只需經駐車場 P_/4，不必到轉換軌
-  const directMaintMaint = (fromA === "maint" && toA === "maint");
-  const needTransferTrack = !(directParkMaint || washToPark || alreadyOnTrans || directMaintMaint);
-
-  let transTK = null;
-  if (needTransferTrack) {
-    if (toA === "main") transTK = mainTrans(toD);
-    else if (toA === "trans") transTK = toD;
-    else if (fromA === "trans") transTK = fromD;
-    else transTK = randTrans();
-  }
-
-  // 3-1. 進轉換軌前中繼（若從維修工廠出發，必經駐車場，此處模擬短暫通過駐車場 P_/4 作為中繼；
-  //      但 OCC 實務未必分段指派此點，故與下一段合併為「行駛至轉換軌」）
-  //      為對話真實性，這裡不再額外拆點。
-
-  /* ---------- 3.5 維修出發時，先到駐車場 P_/4 換端 ---------- */
-  // 維修 → 轉換軌/正線/維修：出棚外升弓後，先到駐車場 P_/4 換端（若目標在另一側）
-  const transitFromMaint = (fromA === "maint" && (toA === "trans" || toA === "main" || toA === "maint"));
-  if (transitFromMaint) {
-    const zoneTK = pickTransitParkTK(power);
-    pts.push({
-      loc: `${zoneTK}廠棚外`,
-      report: `已停妥${zoneTK}廠棚外，升弓並完成換端`,
-      extra: "電壓800V",
-      _transit: true,
-      _needFlip: true,
-      _maintDepShed: true
-    });
-  }
-
-  /* ---------- 4. 轉換軌點（若經過，且非目的地） ---------- */
-  if (needTransferTrack && toA !== "trans") {
-    const toMain = (toA === "main");
-    let transReport = `已停妥${transTK}`;
-    if (!toMain) transReport += "並完成換端";
-    pts.push({
-      loc: transTK,
-      report: transReport,
-      _afterTrans: true,
-      _toMain: toMain
-    });
-  }
-
-  /* ---------- 4.5 轉換軌 → 維修：轉換軌後需先經駐車場 P_/4 ---------- */
-  const transitFromTransToMaint = (fromA === "trans" && toA === "maint");
-  if (transitFromTransToMaint) {
-    const zoneTK = pickTransitParkTK(power);
-    pts.push({
-      loc: `${zoneTK}廠棚外`,
-      report: `已停妥${zoneTK}廠棚外`,
-      _transit: true
-    });
-  }
-
-  /* ---------- 5. 目的地前棚外 ---------- */
-  if (toA === "park") {
-    const targetTK = parkTK(toD);
-    const expected = `${targetTK}廠棚外`;
-    const alreadyPushed = pts.some(p => p.loc === expected && p._maintToParkShed);
-    if (!alreadyPushed) {
-      pts.push({
-        loc: expected,
-        report: `已停妥${expected}${noPowerEnd?"，降弓並投入ESS模式":""}`,
-        extra: noPowerEnd ? "雙端電池(80/80%)" : null,
-        _beforePark: true
-      });
-    }
-  } else if (toA === "maint") {
-    pts.push({
-      loc: `${toD}廠棚外`,
-      report: `已停妥${toD}廠棚外，並投入ESS模式`,
-      extra: "雙端電池(80/80%)",
-      _beforeMaint: true
-    });
-  } else if (toA === "wash") {
-    // 洗車軌進入：直接由轉換軌切洗車連結模式駛入
-    // 不再加棚外點
-  }
-
-  /* ---------- 6. 終點 ---------- */
-  if (toA === "park") {
-    pts.push({
-      loc: toD,
-      report: `已停妥${toD}，並將列車關機`,
-      isFinal: true
-    });
-  } else if (toA === "maint") {
-    pts.push({
-      loc: `${toD}外側位置`,
-      report: `已停妥${toD}外側位置，並將列車關機`,
-      isFinal: true
-    });
-  } else if (toA === "wash") {
-    pts.push({
-      loc: "TK301",
-      report: "已抵達TK301洗車軌，開始洗車作業",
-      isFinal: true
-    });
-  } else if (toA === "trans") {
-    pts.push({
-      loc: toD,
-      report: `已停妥${toD}`,
-      isFinal: true
-    });
-  } else if (toA === "main") {
-    pts.push({
-      loc: "正線",
-      report: `已切換主線模式及All Station頻道，正駛出機廠進入${toD}`,
-      isFinal: true
-    });
-  }
-
-  /* ---------- 6.5 在機廠模式/洗車連結模式切換處插入速限牌回報點 ---------- */
-  const expanded = insertSpeedLimitPoints(pts);
-
-  /* ---------- 7. 補上各點的「下段指令」 ---------- */
-  for (let i = 0; i < expanded.length; i++) {
-    const cur = expanded[i];
-    const nxt = expanded[i+1];
-    if (!nxt) continue;
-    fillNextInstruction(cur, nxt, fromA, toA);
-  }
-
-  return expanded;
-}
-
-function insertSpeedLimitPoints(pts) {
-  const out = [];
-  for (let i = 0; i < pts.length; i++) {
-    out.push(pts[i]);
-    const cur = pts[i];
-    const nxt = pts[i+1];
-    if (!nxt) continue;
-    // 往機廠方向：轉換軌 → 棚外/P_/4，中間插入5公里速限牌
-    if (isTransLoc(cur.loc) && (/廠棚外$/.test(nxt.loc) || /^P\d\/4$/.test(nxt.loc))) {
-      out.push({
-        loc: "5公里速限牌",
-        report: "已停妥5公里速限牌，切換洗車連結模式完成",
-        _speedLimit: true
-      });
-    }
-    // 往出廠方向：P_/4 或 維修棚外 → 轉換軌，中間插入25公里速限牌
-    if ((/^P\d\/4$/.test(cur.loc) || /廠棚外$/.test(cur.loc)) && isTransLoc(nxt.loc)) {
-      out.push({
-        loc: "25公里速限牌",
-        report: "已停妥25公里速限牌，切換機廠模式完成",
-        _speedLimit: true
-      });
+    if (persistentFault.tag) {
+      document.getElementById(`bogie-status-${persistentFault.bogie}`).innerText = persistentFault.tag;
     }
   }
-  return out;
-}
-
-function fillNextInstruction(cur, nxt, fromA, toA) {
-  // 預設 confirm
-  if (!cur.confirm) cur.confirm = DEFAULT_CONFIRM;
-  // 特例：_occOnlyPrep 段只要求「完成動車前準備回報」
-  if (cur._occOnlyPrep) {
-    cur.nextMode = null;
-    cur.nextLoc = null;
-    cur.nextDo = "完成動車前準備";
-    cur.confirm = STARTUP_CONFIRM;
-    return;
-  }
-  cur.nextLoc = nxt.loc;
-
-  // 模式判定
-  if ((nxt._maintDepShed || nxt._maintToParkShed) && /^TK1/.test(cur.loc)) {
-    // 自維修工廠內部開出至駐車場棚外：ESS + 洗車連結模式
-    cur.nextMode = "ESS模式及洗車連結模式";
-  } else if (nxt.loc === "5公里速限牌") {
-    cur.nextMode = "機廠模式";
-  } else if (nxt.loc === "25公里速限牌") {
-    cur.nextMode = "洗車連結模式";
-  } else if (cur.loc === "5公里速限牌") {
-    cur.nextMode = "洗車連結模式";
-  } else if (cur.loc === "25公里速限牌") {
-    cur.nextMode = "機廠模式";
-  } else if (isTransLoc(nxt.loc)) {
-    cur.nextMode = "機廠模式";
-  } else if (nxt.loc === "TK301") {
-    cur.nextMode = "洗車連結模式";
-  } else if (/^P\d\/\d$/.test(nxt.loc) || /外側位置$/.test(nxt.loc) || /廠棚外$/.test(nxt.loc)) {
-    cur.nextMode = "洗車連結模式";
-  } else if (nxt.loc === "正線") {
-    cur.nextMode = "主線模式";
-    cur.confirm = ["前方號誌開通","轉轍器方位正確","主線模式及All Station頻道切換完成"];
-  } else {
-    cur.nextMode = "機廠模式";
-  }
-
-  // 決定 nextDo（抵達後要做什麼）
-  if (nxt.loc === "5公里速限牌") {
-    cur.nextDo = "切換洗車連結模式回報";
-    cur.confirm = ["轉轍器方位正確","鄰軌無列車","軌道淨空"];
-  } else if (nxt.loc === "25公里速限牌") {
-    cur.nextDo = "切換機廠模式回報";
-    cur.confirm = ["轉轍器方位正確","鄰軌無列車","軌道淨空"];
-  } else if (nxt._maintDepShed) {
-    // 維修出廠：自維修內出發 → 駐車場棚外升弓並完成換端（離開維修有出口號誌）
-    cur.nextDo = "停妥升弓並完成換端回報";
-    cur.confirm = ["前方號誌開通","轉轍器方位正確","鄰軌無列車","軌道淨空"];
-  } else if (nxt._maintToParkShed) {
-    // 維修 → 駐車場 直達：維修已是 ESS；若目標軌斷電則維持 ESS 不升弓
-    cur.nextDo = nxt._targetNoPower ? "停妥維持ESS模式回報" : "停妥升弓回報";
-    cur.confirm = ["前方號誌開通","轉轍器方位正確","鄰軌無列車","軌道淨空"];
-  } else if (nxt._transit && /廠棚外$/.test(nxt.loc)) {
-    // 轉換軌 → 5km 牌 → 駐車場棚外：駐車場棚外本身無號誌
-    cur.nextDo = "停妥回報";
-    cur.confirm = ["轉轍器方位正確","鄰軌無列車","軌道淨空"];
-  } else if (nxt._beforeMaint) {
-    // 進入維修棚外：維修棚外入口有號誌
-    cur.nextDo = "投入ESS模式回報";
-    cur.confirm = ["前方號誌開通","轉轍器方位正確","鄰軌無列車","軌道淨空"];
-  } else if (nxt._beforePark && /投入ESS/.test(nxt.report)) {
-    cur.nextDo = "降弓並投入ESS模式回報";
-    cur.confirm = ["轉轍器方位正確","鄰軌無列車","軌道淨空"];
-  } else if (nxt._beforePark) {
-    // 駐車場棚外本身無號誌
-    cur.nextDo = "停妥回報";
-    cur.confirm = ["轉轍器方位正確","鄰軌無列車","軌道淨空"];
-  } else if (nxt.isFinal && toA === "park") {
-    // 進入駐車位（從棚外往內），無號誌
-    cur.nextDo = "停妥將列車關機";
-    cur.confirm = ["轉轍器方位正確","目標駐車位號牌"];
-  } else if (nxt.isFinal && toA === "maint") {
-    cur.nextDo = "停妥將列車關機";
-    cur.confirm = ["前方鐵門開啟","軌道淨空"];
-  } else if (nxt.isFinal && toA === "main") {
-    cur.nextDo = "切換主線模式及All Station頻道後駛出機廠";
-    cur.confirm = ["前方號誌開通","轉轍器方位正確"];
-  } else if (nxt.isFinal && toA === "trans") {
-    cur.nextDo = "停妥回報";
-  } else if (nxt.isFinal && toA === "wash") {
-    cur.nextDo = "進入洗車機洗車";
-    cur.confirm = ["前方號誌開通","轉轍器方位正確","洗車機雙燈綠燈"];
-  } else if (/^P\d\/4$/.test(nxt.loc)) {
-    cur.nextDo = nxt._needFlip ? "停妥並換端回報" : "停妥回報";
-    // 駐車場內/出棚外行駛：僅須確認方位/淨空
-    cur.confirm = nxt._transit ? ["轉轍器方位正確","鄰軌無列車","軌道淨空"] : [];
-  } else if (isTransLoc(nxt.loc)) {
-    const toMain = (toA === "main");
-    cur.nextDo = toMain ? "切換主線模式及All Station頻道後回報" : "停妥後換端回報";
-  } else if (/廠棚外$/.test(nxt.loc) && /^TK1/.test(nxt.loc)) {
-    cur.nextDo = "升弓回報";
+  else if (scenario === "fault_power") { document.getElementById("cms-p").className = "cms-icon fault"; }
+  else if (scenario === "fault_door") { document.getElementById("d-m2l").className = "door-box offline"; document.getElementById("d-m4l").className = "door-box offline"; }
+  else if (scenario === "fault_speed") { document.getElementById("atp-hmi").className = "atp-hmi fault"; document.getElementById("atp-limit").innerText = "E3516"; }
+  else if (scenario === "tetra_special") { 
+    navDiag.classList.add('alert'); 
+    diag.innerText = "ESS1放電電流過大/ESS1電池芯電壓差過大/ESS1電池偵測版異常，電池未跳脫"; 
+    document.getElementById("cms-t").className = "cms-icon fault"; 
   }
 }
 
-/* ================== 產生對話 ================== */
+function handleCMSClick(action) {
+  if (pendingAction === action || (action === '隔離轉向架' && pendingAction === '煞車解除')) {
+    if (action === 'TCU錯誤復位') {
+      document.getElementById('btn-tcu-reset').style.background = "#10b981";
+      setTimeout(() => {
+        document.getElementById("cms-t").className = "cms-icon active-t";
+        ["t-m1-1","t-m1-2","t-m5-1","t-m5-2"].forEach(id => document.getElementById(id).className = "cms-icon active-t");
+        document.getElementById("diag-content").innerText = "無主動故障紀錄"; document.getElementById("nav-diag").classList.remove('alert');
+      }, 300);
+    }
+    if (action === '空調重置') document.getElementById('btn-ac-reset').style.background = "#10b981";
+    if (action === '全開全關') document.getElementById('btn-door-all').style.background = "#10b981";
+    if (action === '隔離轉向架') { 
+      const bNames = ['m1','m3','m5'];
+      const selBogie = bNames[currentBogieIdx];
+      document.querySelector('.bogie-unit.selected').classList.add('isolated'); 
+      if (selBogie === persistentFault.bogie) {
+        // 隔離正確轉向架，E1 消失變回 HB
+        document.getElementById("cms-gear").innerText = "HB";
+        document.getElementById("cms-gear").className = "cms-gear-display";
+        document.getElementById("cms-t").className = "cms-icon active-t";
+        // 注意：ERR 標籤不清除，繼續存在直到重開機
+      }
+      document.getElementById('btn-bogie-isolate').style.background = "#10b981"; 
+      return; 
+    }
+    if (action === '後視鏡重置') document.getElementById('btn-mirror-reset').style.background = "#10b981";
+    completedActions.add(revealed); setTimeout(() => { pendingAction = null; render(); }, 500);
+  } else if (action === '隔離轉向架') {
+    document.querySelector('.bogie-unit.selected').classList.toggle('isolated');
+  }
+}
+
+function handleEmergencyClick(action) { if (pendingAction === action) { completedActions.add(revealed); pendingAction = null; render(); } }
+
+function updateEmergencyPanel(action) {
+  const panel = document.getElementById('emergency-panel');
+  if (!action) { panel.style.display = "none"; return; }
+  panel.style.display = "block";
+  const buttons = ["列車自動保護 Bypass", "煞車解除", "集電弓降弓 HV OFF", "上下車門", "降級模式", "ATP重置"];
+  document.getElementById('em-btns').innerHTML = buttons.map(b => `<div class="em-btn ${b === action ? 'highlight' : ''}" onclick="handleEmergencyClick('${b}')">${b}</div>`).join("");
+}
+
+function addMinutesToTime(timeStr, mins) {
+  const [h, m] = timeStr.split(':').map(Number);
+  const date = new Date(); date.setHours(h, m + mins);
+  return `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+}
+
+function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
+  let pts = [];
+  function getTravelTime(f, t) {
+    if ((f.includes("V01")&&t.includes("V11")) || (f.includes("V11")&&t.includes("V01"))) return 23;
+    if (f.includes("V01")&&t.includes("V26")) return 27; if (f.includes("V26")&&t.includes("V01")) return 28;
+    return (f.includes("V26")||t.includes("V26")) ? 28 : 23;
+  }
+  let legs = [];
+  if ((fD.includes("V11")||fD.includes("1-0")||fD.includes("2-0")) && tD.includes("V26")) legs = [{f:fD, t:"V01 2月台"}, {f:"V01 2月台", t:tD}];
+  else if (fD.includes("V26") && tD.includes("V11")) legs = [{f:fD, t:"V01 1月台"}, {f:"V01 1月台", t:tD}];
+  else legs = [{f:fD, t:tD}];
+
+  let runningTime = depTime;
+  for (let i = 0; i < legs.length; i++) {
+    const leg = legs[i]; const r = ROUTES_MAP[`${leg.f}-${leg.t}`] || "無路徑";
+    let curPt = null;
+    if (i === 0) {
+      if (leg.f.includes("1-0")) curPt = { loc: leg.f, report: "已完成車底車外巡視，做好動車前準備", _isBackupDeparture10: true };
+      else if (leg.f.includes("2-0")) curPt = { loc: leg.f, report: "已完成交接做好動車前準備", _isBackupDeparture20: true };
+      else if (fA === "depot") curPt = { loc: leg.f, report: `已停妥${leg.f}，做好動車前準備`, _isDepotDeparture: true };
+      else { let act = leg.f.includes("V11 2月台") ? "勤務交接" : "換端"; curPt = { loc: leg.f, report: `已完成${act}，接收建議路徑${r}，確認前方號誌開通，依時刻表${runningTime}發車`, _isChangeEnd: true }; }
+    } else { curPt = { loc: leg.f, report: `已完成換端，接收建議路徑${r}，確認前方號誌開通，依時刻表${runningTime}發車`, _isChangeEnd: true }; }
+    pts.push(curPt);
+
+    if (scenario === "normal" && leg.t.includes("V01")) pts.push({ _isTetraSpecial: true, loc: "V09 2月台", report: "稍早通過J04路口時，列車牽引動力不足，僅消耗M2儲能電池，M2電池70%，M4電池90%，診斷頁面顯示ESS1放電電流過大/ESS1電池芯電壓差過大/ESS1電池偵測版異常，電池未跳脫" });
+    runningTime = addMinutesToTime(runningTime, getTravelTime(leg.f, leg.t) + 6);
+
+    const roll = Math.random();
+    if ((scenario === "random_fault" && roll > 0.3) || (scenario.startsWith("fault_"))) {
+      const fKey = scenario.startsWith("fault_") ? scenario : Object.keys(FAULT_DATA)[Math.floor(Math.random()*7)];
+      pts.push({ loc: `${leg.f} 往 ${leg.t} 途中`, _isFaultScenario: true, faultKey: fKey, faultName: FAULT_DATA[fKey].name, steps: FAULT_DATA[fKey].steps });
+    } else if (scenario === "scenario_point") {
+      pts.push({ loc: "V09 1月台", _isPointScenario: true, pointId: "EPM100", side: "左位" });
+    } else if (scenario === "scenario_pei") {
+      pts.push({ loc: `${leg.f} 往 ${leg.t} 途中`, _isPEIScenario: true });
+    } else if (scenario === "delay_intersection") {
+      const j = AREAS.intersections.items[Math.floor(Math.random()*18)];
+      pts.push({ loc: j, _isDelayScenario: true, isUplink: (leg.t.includes("V11")||leg.t.includes("V26")), report: `稍早於${leg.f}等候旅客上下車，未能通過${j}，待下一輪號誌開通後再通過路口` });
+    }
+  }
+  const finalPt = (tA === "depot") ? { loc: tD, report: `已停妥${tD}${tD.includes("2-0")?"，完成交接":"，Tetra轉G01完成"}`, isFinal: true } : { loc: tD, report: `已完成換端，接收建議路徑${ROUTES_MAP[tD+'-'+fD] || '[路徑號]'}，確認前方號誌開通，依時刻表發車`, isFinal: true };
+  pts.push(finalPt);
+
+  return pts;
+}
+
 function makeChunks(trainId, pts) {
   const chunks = [];
-  for (let i = 0; i < pts.length; i++) {
-    const cur = pts[i];
+  pts.forEach((cur, i) => {
     const nxt = pts[i+1];
-
-    // 當前點的 driver 呼叫
-    const extraStr = cur.extra ? `，${cur.extra}` : "";
-    const driverCall = `${cur.loc}，${trainId}車呼叫OCC，${cur.report}${extraStr}，OVER`;
-
-    if (cur.isFinal || !nxt) {
-      // 最終段：OCC 收到即可
-      chunks.push({
-        title: `【終點】${cur.loc}`,
-        isFinal: true,
-        lines: [
-          { who: "司機員", text: driverCall },
-          { who: "OCC",   text: `OCC收到，${trainId}車，${cur.report}${extraStr}。通話完畢。` }
-        ]
+    if (cur._isTetraSpecial) {
+      const call = `${cur.loc}，${trainId}車呼叫OCC，${cur.report}，OVER`;
+      const reply = `OCC收到，${cur.loc}${trainId}車回報，${cur.report}，請${trainId}車執行TCU錯誤復位後持續留意觀察，通話完畢。`;
+      const repeat = `${trainId}車收到，執行TCU錯誤復位後持續留意觀察，通話完畢。`;
+      chunks.push({ title: "【無線電】Tetra 故障回報", lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }], requireAction: "TCU錯誤復位", faultKey: "tetra_special" });
+    } else if (cur._isPointScenario) {
+      const occCall = `OCC呼叫${cur.loc}${trainId}車，請${trainId}車司機員攜帶轉轍桿、Tetra、車間門鑰匙至轉轍器${cur.pointId}前，將轉轍器${cur.pointId}扳轉至${cur.side}定位後回報，OVER`;
+      const driverRepeat = `${trainId}車收到，攜帶轉轍桿、Tetra、車間門鑰匙至轉轍器${cur.pointId}前，將轉轍器${cur.pointId}扳轉至${cur.side}定位後回報，通話完畢。`;
+      chunks.push({ title: "【營運】轉轍器手動扳轉 - 指示", lines: [{ who: "OCC", text: occCall }, { who: "司機員", text: driverRepeat }] });
+      
+      const driverReport = `${cur.loc}${trainId}車呼叫OCC，已將${cur.pointId}扳轉至${cur.side}定位，確認軌尖密合，OVER`;
+      const occReply = `OCC收到，已確認${cur.pointId}扳轉至${cur.side}定位，確認軌尖密合，請${trainId}車司機員返回列車，稍後可冒前方雙燈，依路口四燈號誌通過，沿途請確認轉轍器方位正確後再慢速通過，通話完畢。`;
+      chunks.push({ title: "【營運】轉轍器手動扳轉 - 完成", lines: [{ who: "司機員", text: driverReport }, { who: "OCC", text: occReply }] });
+    } else if (cur._isPEIScenario) {
+      const call = `${cur.loc}，${trainId}車呼叫OCC，稍早旅客按壓 PEI，通報有旅客身體不適，請求於下一站停車並由救護人員協助，OVER`;
+      const reply = `OCC收到，${trainId}車，請於下一站停車待命，已通知相關人員，OVER`;
+      const repeat = `${trainId}車收到，於下一站停車待命，通話完畢。`;
+      chunks.push({ title: "【營運】PEI 旅客對講機", lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }] });
+    } else if (cur._isFaultScenario) {
+      cur.steps.forEach((s, idx) => {
+        const call = `${cur.loc}，${trainId}車呼叫OCC，${s.report}，OVER`;
+        if (s.type === "final") {
+          const reply = `OCC收到，${trainId}車回報，${s.report.replace(/。請問.*$/,"")}，准許${trainId}車發車回報之要求，通話完畢。`;
+          chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }], requireAction: null, faultKey: cur.faultKey });
+        } else {
+          const act = s.type === 'cms' ? `執行CMS「${s.action}」作業` : `按壓應急按鈕「${s.action}」`;
+          const reply = `OCC收到，${trainId}車，請${act}，確認列車是否恢復，OVER`;
+          const repeat = `${trainId}車收到，${act}，通話完畢。`;
+          chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }], requireAction: s.action, faultKey: cur.faultKey });
+        }
       });
-      continue;
+    } else if (cur._isDelayScenario) {
+      const call = `${cur.loc}，${trainId}車呼叫OCC，${cur.report}，OVER`;
+      const reply = `OCC收到，${cur.loc}${trainId}車回報，${cur.report}，請待下一輪號誌開通，確認路口淨空後通過，OVER`;
+      const repeat = `${trainId}車收到，待下一輪號誌開通，確認路口淨空後通過，通話完畢。`;
+      chunks.push({ title: `【延誤】${cur.loc}紅燈`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }] });
+    } else {
+      const call = `${cur.loc}，${trainId}車呼叫OCC，${cur.report}，OVER`;
+      const reply = `OCC收到，${cur.loc}${trainId}車回報，${cur.report}，通話完畢。`;
+      chunks.push({ title: cur.isFinal ? "【終點】" : "【起始】", isFinal: cur.isFinal, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }] });
     }
-
-    // 非最終：OCC 給下段指令
-    const modeStr = cur.nextMode ? `以${cur.nextMode}` : "";
-    const confirmStr = (cur.confirm && cur.confirm.length > 0) ? `請${trainId}車確認${cur.confirm.join("、")}，` : "";
-    const driveStr = (cur.nextMode && cur.nextLoc) ? `${modeStr}行駛至${cur.nextLoc}，` : "";
-    const doStr = cur.nextDo ? `${cur.nextDo}` : "";
-    const occReply = cur._occOnlyPrep
-      ? `OCC收到，${trainId}車，${cur.report}，請${trainId}車${cur.nextDo}回報。通話完畢。`
-      : `OCC收到，${trainId}車，${cur.report}${extraStr}，${confirmStr}${driveStr}${doStr}${doStr.endsWith("回報")?"":"回報"}。OVER`;
-
-    const readbackBody = cur._occOnlyPrep
-      ? `${cur.nextDo}回報`
-      : `${(cur.confirm&&cur.confirm.length>0)?"確認"+cur.confirm.join("、")+"，":""}${driveStr}${doStr}${doStr.endsWith("回報")?"":"回報"}`;
-    const readback = `${trainId}車收到，${readbackBody}，通話完畢。`;
-
-    chunks.push({
-      title: `【段 ${i+1}】${cur.loc} → ${cur.nextLoc||"（開機準備）"}`,
-      isFinal: false,
-      lines: [
-        { who: "司機員", text: driverCall },
-        { who: "OCC",   text: occReply },
-        { who: "司機員", text: readback }
-      ]
-    });
-  }
+  });
   return chunks;
 }
 
-/* ================== UI ================== */
-function fillArea(sel, keys) {
-  sel.innerHTML = keys.map(k => `<option value="${k}">${AREAS[k].label}</option>`).join("");
-}
-function fillDetail(sel, areaKey) {
-  sel.innerHTML = AREAS[areaKey].items.map(v => `<option value="${v}">${v}</option>`).join("");
-}
-const fromArea = document.getElementById("fromArea");
-const fromDetail = document.getElementById("fromDetail");
-const toArea = document.getElementById("toArea");
-const toDetail = document.getElementById("toDetail");
-fillArea(fromArea, FROM_AREAS);
-fillArea(toArea, TO_AREAS);
-fillDetail(fromDetail, fromArea.value);
-fillDetail(toDetail, toArea.value);
-fromArea.addEventListener("change", () => fillDetail(fromDetail, fromArea.value));
-toArea.addEventListener("change", () => fillDetail(toDetail, toArea.value));
-
-function validate(fromA, fromD, toA, toD) {
-  if (fromA === toA && fromD === toD) return "起點與目的地相同。";
-  if (toA === "wash" && fromA !== "trans") return "洗車軌僅能由轉換軌進入（單向）。";
-  if (fromA === "wash" && toA !== "park") return "洗車軌出口僅通往駐車場（單向）。";
-  return null;
-}
-
-let currentChunks = [];
-let revealed = 0;
-
 function render() {
-  const box = document.getElementById("result");
-  const total = currentChunks.length;
-  if (total === 0) { box.innerHTML = ""; return; }
-  const progress = `<div class="progress">已顯示 ${revealed} / ${total} 段</div>`;
-  const shown = currentChunks.slice(0, revealed).map(c => chunkHtml(c)).join("");
-  const nextBtn = (revealed < total)
-    ? `<button id="nextBtn">繼續 — 已完成上段回報（第 ${revealed+1} 段）</button>`
-    : `<div class="hint">✓ 全部調車程序已完成。</div><button id="restartBtn" class="secondary">重新開始</button>`;
-  box.innerHTML = `<div class="card"><h2>無線電對話（分段式）</h2>${progress}${shown}${nextBtn}</div>`;
-  const nb = document.getElementById("nextBtn");
-  if (nb) nb.addEventListener("click", () => {
-    revealed++;
-    render();
-    const last = document.querySelectorAll(".chunk");
-    if (last.length) last[last.length-1].scrollIntoView({behavior:"smooth", block:"center"});
-  });
-  const rb = document.getElementById("restartBtn");
-  if (rb) rb.addEventListener("click", () => { revealed = 1; render(); });
+  const box = document.getElementById("result"); if (currentChunks.length === 0) return;
+  const lastChunk = currentChunks[revealed - 1];
+  if (lastChunk && lastChunk.faultKey) updateCMSDisplay(lastChunk.faultKey);
+  const cmsActions = ['TCU錯誤復位', '隔離轉向架', '全開全關', '空調重置', '後視鏡重置'];
+  pendingAction = (lastChunk && !completedActions.has(revealed)) ? lastChunk.requireAction : null;
+  document.querySelectorAll('.sub-btn, .sub-nav-btn, .nav-btn').forEach(b => b.classList.remove('highlight'));
+  if (pendingAction) {
+    if (cmsActions.includes(pendingAction)) {
+      if (pendingAction === 'TCU錯誤復位') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-propulsion').classList.add('highlight'); document.getElementById('btn-tcu-reset').classList.add('highlight'); }
+      if (pendingAction === '後視鏡重置') document.getElementById('btn-mirror-reset').classList.add('highlight');
+      if (pendingAction === '空調重置') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-ac').classList.add('highlight'); document.getElementById('btn-ac-reset').classList.add('highlight'); }
+      if (pendingAction === '隔離轉向架') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-brake').classList.add('highlight'); document.getElementById('btn-bogie-isolate').classList.add('highlight'); }
+      if (pendingAction === '全開全關') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-door').classList.add('highlight'); document.getElementById('btn-door-all').classList.add('highlight'); }
+      updateEmergencyPanel(null);
+    } else updateEmergencyPanel(pendingAction);
+  } else updateEmergencyPanel(null);
+
+  const progress = `<div class="progress">已顯示 ${revealed} / ${currentChunks.length} 段</div>`;
+  const shown = currentChunks.slice(0, revealed).map(c => `<div class="chunk ${c.isFinal?'final':''}"><div class="chunk-title">${c.title}</div>${c.lines.map(l=>`<div class="line ${l.who==='司機員'?'driver':'occ'}"><span class="who">${l.who}</span><span class="text">${l.text}</span></div>`).join("")}</div>`).join("");
+  let nextBtn = (revealed < currentChunks.length) ? `<button id="nextBtn" ${pendingAction ? 'disabled' : ''}>${pendingAction ? '等待執行操作：'+pendingAction : '繼續 — 已完成上段回報'}</button>` : `<button onclick="location.reload()">重新開始</button>`;
+  box.innerHTML = `<div class="card"><h2>無線電對話</h2>${progress}${shown}${nextBtn}</div>`;
+  const nb = document.getElementById("nextBtn"); if(nb) nb.onclick = () => { revealed++; render(); window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'}); };
 }
 
-function chunkHtml(c) {
-  const lines = c.lines.map(l => `<div class="line ${l.who==='司機員'?'driver':'occ'}"><span class="who">${l.who}</span><span class="text">${l.text}</span></div>`).join("");
-  return `<div class="chunk ${c.isFinal?'final':''}"><div class="chunk-title">${c.title}</div>${lines}</div>`;
-}
+const fA_el = document.getElementById("fromArea"); const fD_el = document.getElementById("fromDetail");
+const tA_el = document.getElementById("toArea"); const tD_el = document.getElementById("toDetail");
+const fill = (sel, keys) => sel.innerHTML = keys.map(k => `<option value="${k}">${AREAS[k].label}</option>`).join("");
+const fillD = (sel, area) => sel.innerHTML = AREAS[area].items.map(v => `<option value="${v}">${v}</option>`).join("");
+fill(fA_el, ["mainline", "blue"]); fill(tA_el, ["mainline", "green", "blue", "depot"]);
+fillD(fD_el, fA_el.value); fillD(tD_el, tA_el.value);
+fA_el.onchange = () => fillD(fD_el, fA_el.value); tA_el.onchange = () => fillD(tD_el, tA_el.value);
 
-document.getElementById("genBtn").addEventListener("click", () => {
-  const power = document.getElementById("powerState").value;
-  const trainId = (document.getElementById("trainId").value || "101").trim();
-  const fA = fromArea.value, fD = fromDetail.value;
-  const tA = toArea.value, tD = toDetail.value;
-  const err = validate(fA, fD, tA, tD);
-  const box = document.getElementById("result");
-  if (err) { box.innerHTML = `<div class="error">⚠ ${err}</div>`; return; }
-  const pts = buildPoints(fA, fD, tA, tD, power);
-  currentChunks = makeChunks(trainId, pts);
-  revealed = 1;
-  render();
-  box.scrollIntoView({behavior:"smooth", block:"start"});
-});
+document.getElementById("genBtn").onclick = () => {
+  const tId = document.getElementById("trainId").value || "101";
+  const scenario = document.getElementById("scenario").value;
+  const depTime = `${String(Math.floor(Math.random()*24)).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`;
+  completedActions.clear();
+  resetFaultState();
+  currentChunks = makeChunks(tId, buildPoints(fA_el.value, fD_el.value, tA_el.value, tD_el.value, depTime, scenario, document.getElementById("endAction").value));
+  revealed = 1; render();
+};
 </script>
 </body>
 </html>
