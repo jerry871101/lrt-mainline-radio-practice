@@ -14,8 +14,10 @@
     line-height: 1.65;
     padding: 12px;
     font-size: 15px;
-    padding-top: 310px; /* 為固定置頂 CMS 預留空間 */
+    padding-top: 345px; /* 為固定置頂 CMS 預留空間（高度 335 + 邊距） */
   }
+  /* 整個 App 限制最大寬度並置中（640px 才容得下首頁資訊排 + 右側直立列車） */
+  .main-content { max-width: 640px; margin: 0 auto; }
   h1 { font-size: 19px; margin: 6px 0 14px; text-align: center; color: #60a5fa; }
   .card { background: #1e293b; border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #334155; }
   .card h2 { font-size: 15px; margin: 0 0 10px; color: #93c5fd; border-bottom: 1px solid #334155; padding-bottom: 6px; }
@@ -31,7 +33,8 @@
   /* CMS 核心樣式 */
   .cms-area {
     position: fixed; top: 0; left: 0; right: 0; z-index: 2000;
-    background: #000; border-bottom: 4px solid #475569; padding: 12px; height: 300px;
+    max-width: 640px; margin-left: auto; margin-right: auto; /* 與 .main-content 同寬置中 */
+    background: #000; border-bottom: 4px solid #475569; padding: 12px; height: 335px;
     display: flex; flex-direction: column; gap: 8px; font-family: "Consolas", monospace;
     box-shadow: 0 5px 20px rgba(0,0,0,0.9);
   }
@@ -94,6 +97,7 @@
   .emergency-panel { background: #450a0a; border: 2px solid #991b1b; border-radius: 8px; padding: 12px; margin-bottom: 15px; }
   .em-btn { background: #7f1d1d; color: #fff; border: 2px solid #dc2626; padding: 12px; font-size: 14px; border-radius: 4px; text-align: center; font-weight: bold; cursor: pointer; }
   .em-btn.highlight { background: #ef4444; box-shadow: 0 0 15px #ef4444; }
+  .em-btn.used { background: #1e293b; color: #475569; border-color: #334155; cursor: not-allowed; }
   .chunk { background: #0f172a; border-left: 3px solid #3b82f6; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
   .chunk.final { border-left-color: #10b981; }
   .chunk-title { font-size: 13px; color: #fbbf24; font-weight: bold; margin-bottom: 8px; }
@@ -240,6 +244,53 @@
 </div>
 
 <script>
+// 站序對照表（上行：V01→V11→V26，下行反向）
+const STATION_SEQUENCE = ["V01","V02","V03","V04","V05","V06","V07","V08","V09","V10","V11"];
+const BLUE_SEQUENCE    = ["V01","V26","V27","V28"];
+
+function getAdjacentFaultLocation(from, to) {
+  // 取得 from 和 to 的站名（去掉月台）
+  const getStation = s => s.replace(/ [12]月台.*/, '').trim();
+  const fromSt = getStation(from);
+  const toSt   = getStation(to);
+
+  // 決定用哪個序列
+  let seq = STATION_SEQUENCE;
+  if (fromSt === 'V26' || toSt === 'V26' || fromSt === 'V27' || toSt === 'V27' || fromSt === 'V28' || toSt === 'V28') {
+    seq = BLUE_SEQUENCE;
+  }
+
+  const fi = seq.indexOf(fromSt);
+  const ti = seq.indexOf(toSt);
+
+  // 若找不到站序（如路口、機廠），fallback 用原本的描述
+  if (fi === -1 || ti === -1) return `${from} 往 ${to} 途中`;
+
+  const direction = ti > fi ? 1 : -1;
+  // 從 from 開始往 to 方向，收集途中的站（不含起終點）
+  const midStations = [];
+  for (let i = fi + direction; i !== ti; i += direction) {
+    midStations.push(seq[i]);
+  }
+
+  // 加入 from 的下一站（司機員最容易報告的相鄰段）
+  const nextSt = seq[fi + direction];
+  if (!nextSt) return `${from} 往 ${to} 途中`;
+
+  // 在 from 與 from下一站 之間隨機插入故障，或在中間某站間插入
+  const candidates = [];
+  // 至少有 from→nextSt 這一段
+  candidates.push({ a: fromSt, b: nextSt });
+  // 若途中還有其他站，也加入候選
+  for (let i = 0; i < midStations.length; i++) {
+    const cur = midStations[i];
+    const nxt = midStations[i+1] || toSt;
+    candidates.push({ a: cur, b: nxt });
+  }
+  const pick = candidates[Math.floor(Math.random() * candidates.length)];
+  return `${pick.a} 往 ${pick.b} 之間途中`;
+}
+
 const AREAS = {
   mainline: { label: "正線站點", items: ["臨時駐車位置 1-0", "臨時駐車位置 2-0", "V11 1月台", "V11 2月台", "V01 1月台", "V01 2月台", "V26 1月台", "V26 2月台"]},
   green: { label: "綠山線", items: ["V01 1月台", "V01 2月台", "V02 1月台", "V02 2月台", "V03 1月台", "V03 2月台", "V04 1月台", "V04 2月台", "V05 1月台", "V05 2月台", "V06 1月台", "V06 2月台", "V07 1月台", "V07 2月台", "V08 1月台", "V08 2月台", "V09 1月台", "V09 2月台", "V10 1月台", "V10 2月台", "V11 1月台", "V11 2月台"]},
@@ -286,14 +337,17 @@ const FAULT_DATA = {
 };
 
 let pendingAction = null; let currentChunks = []; let revealed = 0;
-let completedActions = new Set(); 
+let completedActions = new Set();
+let activeEmergencyButtons = new Set(); // 已按壓過的應急按鈕，直到重開機才復歸
 let currentBogieIdx = 0; // 0:M1, 1:M3, 2:M5
 let isACOff = false;
 let isFlangeLubOn = false;
-let persistentFault = { bogie: null, tag: null, tIndex: null };
+let persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false };
 
-function resetFaultState() {
-  persistentFault = { bogie: null, tag: null, tIndex: null };
+function resetFaultState(isRestart) {
+  persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false };
+  // 只有執行清車重開機才復歸應急按鈕
+  if (isRestart) activeEmergencyButtons.clear();
 }
 
 function toggleACOff() {
@@ -366,13 +420,21 @@ function updateCMSDisplay(scenario) {
     document.getElementById("cms-t").className = "cms-icon fault"; 
     document.getElementById("t-m1-1").className = "cms-icon inactive"; 
   }
-  else if (scenario === "fault_brake") { 
-    gear.innerText = "E1"; gear.className = "cms-gear-display fault";
-    document.getElementById("cms-t").className = "cms-icon fault"; 
+  else if (scenario === "fault_brake") {
     // 持久化故障位置
     if (!persistentFault.bogie) {
       persistentFault.bogie = ["m1","m3","m5"][Math.floor(Math.random()*3)];
       persistentFault.tag = Math.random() > 0.5 ? "ERR" : "SE";
+    }
+    if (persistentFault.isolated) {
+      // 已隔離故障轉向架：列車回復 HB 可移動，但該轉向架故障標籤(ERR/SE)持續顯示
+      gear.innerText = "HB"; gear.className = "cms-gear-display";
+      document.getElementById("cms-t").className = "cms-icon active-t";
+      const bu = document.getElementById('bogie-' + persistentFault.bogie.toUpperCase());
+      if (bu) bu.classList.add('isolated');
+    } else {
+      gear.innerText = "E1"; gear.className = "cms-gear-display fault";
+      document.getElementById("cms-t").className = "cms-icon fault";
     }
     if (persistentFault.tag) {
       document.getElementById(`bogie-status-${persistentFault.bogie}`).innerText = persistentFault.tag;
@@ -403,16 +465,18 @@ function handleCMSClick(action) {
     if (action === '隔離轉向架') { 
       const bNames = ['m1','m3','m5'];
       const selBogie = bNames[currentBogieIdx];
-      document.querySelector('.bogie-unit.selected').classList.add('isolated'); 
+      document.querySelector('.bogie-unit.selected').classList.add('isolated');
       if (selBogie === persistentFault.bogie) {
-        // 隔離正確轉向架，E1 消失變回 HB
+        // 隔離正確轉向架：標記已隔離 → 列車回復 HB 可移動（ERR 標籤持續顯示直到重開機）
+        persistentFault.isolated = true;
         document.getElementById("cms-gear").innerText = "HB";
         document.getElementById("cms-gear").className = "cms-gear-display";
         document.getElementById("cms-t").className = "cms-icon active-t";
-        // 注意：ERR 標籤不清除，繼續存在直到重開機
+        document.getElementById('btn-bogie-isolate').style.background = "#10b981";
+        completedActions.add(revealed); setTimeout(() => { pendingAction = null; render(); }, 500);
       }
-      document.getElementById('btn-bogie-isolate').style.background = "#10b981"; 
-      return; 
+      // 隔離錯誤轉向架：不完成步驟，維持 E1 故障，使用者可切換其他轉向架重試
+      return;
     }
     if (action === '後視鏡重置') document.getElementById('btn-mirror-reset').style.background = "#10b981";
     completedActions.add(revealed); setTimeout(() => { pendingAction = null; render(); }, 500);
@@ -421,14 +485,34 @@ function handleCMSClick(action) {
   }
 }
 
-function handleEmergencyClick(action) { if (pendingAction === action) { completedActions.add(revealed); pendingAction = null; render(); } }
+function handleEmergencyClick(action) {
+  if (pendingAction === action) {
+    activeEmergencyButtons.add(action); // 記錄已按壓的應急按鈕
+    completedActions.add(revealed);
+    // 若是清車重開機按下降級模式，觸發復歸
+    if (action === '降級模式') {
+      const lastChunk = currentChunks[revealed - 1];
+      if (lastChunk && lastChunk.faultKey === 'fault_restart') {
+        resetFaultState(true); // 清車重開機：復歸所有應急按鈕
+      }
+    }
+    pendingAction = null;
+    render();
+  }
+}
 
 function updateEmergencyPanel(action) {
   const panel = document.getElementById('emergency-panel');
   if (!action) { panel.style.display = "none"; return; }
   panel.style.display = "block";
   const buttons = ["列車自動保護 Bypass", "煞車解除", "集電弓降弓 HV OFF", "上下車門", "降級模式", "ATP重置"];
-  document.getElementById('em-btns').innerHTML = buttons.map(b => `<div class="em-btn ${b === action ? 'highlight' : ''}" onclick="handleEmergencyClick('${b}')">${b}</div>`).join("");
+  document.getElementById('em-btns').innerHTML = buttons.map(b => {
+    const isTarget  = b === action;
+    const isUsed    = activeEmergencyButtons.has(b) && !isTarget;
+    const cssClass  = isTarget ? 'highlight' : (isUsed ? 'used' : '');
+    const clickable = isTarget && !activeEmergencyButtons.has(b);
+    return `<div class="em-btn ${cssClass}" ${clickable ? `onclick="handleEmergencyClick('${b}')"` : ''}>${b}${isUsed ? ' ✓' : ''}</div>`;
+  }).join("");
 }
 
 function addMinutesToTime(timeStr, mins) {
@@ -467,7 +551,8 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
     const roll = Math.random();
     if ((scenario === "random_fault" && roll > 0.3) || (scenario.startsWith("fault_"))) {
       const fKey = scenario.startsWith("fault_") ? scenario : Object.keys(FAULT_DATA)[Math.floor(Math.random()*7)];
-      pts.push({ loc: `${leg.f} 往 ${leg.t} 途中`, _isFaultScenario: true, faultKey: fKey, faultName: FAULT_DATA[fKey].name, steps: FAULT_DATA[fKey].steps });
+      const faultLoc = getAdjacentFaultLocation(leg.f, leg.t);
+      pts.push({ loc: faultLoc, _isFaultScenario: true, faultKey: fKey, faultName: FAULT_DATA[fKey].name, steps: FAULT_DATA[fKey].steps });
     } else if (scenario === "scenario_point") {
       pts.push({ loc: "V09 1月台", _isPointScenario: true, pointId: "EPM100", side: "左位" });
     } else if (scenario === "scenario_pei") {
@@ -565,12 +650,29 @@ fill(fA_el, ["mainline", "blue"]); fill(tA_el, ["mainline", "green", "blue", "de
 fillD(fD_el, fA_el.value); fillD(tD_el, tA_el.value);
 fA_el.onchange = () => fillD(fD_el, fA_el.value); tA_el.onchange = () => fillD(tD_el, tA_el.value);
 
+// 視窗比 CMS 設計寬度(640)窄時（手機），整個 CMS 等比例縮小以完整顯示、不裁切；桌機維持原寸置中
+function fitCMS() {
+  const cms = document.getElementById('cms');
+  const DESIGN = 640, H = 335;
+  if (window.innerWidth < DESIGN) {
+    const s = window.innerWidth / DESIGN;
+    Object.assign(cms.style, { width: DESIGN + 'px', maxWidth: 'none', left: '0', right: 'auto', marginLeft: '0', marginRight: '0', transformOrigin: 'top left', transform: 'scale(' + s + ')' });
+    document.body.style.paddingTop = Math.ceil(H * s + 10) + 'px';
+  } else {
+    ['width','maxWidth','left','right','marginLeft','marginRight','transformOrigin','transform'].forEach(k => cms.style[k] = '');
+    document.body.style.paddingTop = '';
+  }
+}
+window.addEventListener('resize', fitCMS);
+fitCMS();
+
 document.getElementById("genBtn").onclick = () => {
   const tId = document.getElementById("trainId").value || "101";
   const scenario = document.getElementById("scenario").value;
   const depTime = `${String(Math.floor(Math.random()*24)).padStart(2,'0')}:${String(Math.floor(Math.random()*60)).padStart(2,'0')}`;
   completedActions.clear();
-  resetFaultState();
+  activeEmergencyButtons.clear(); // 每次重新產生情境，清空應急按鈕狀態
+  resetFaultState(false);
   currentChunks = makeChunks(tId, buildPoints(fA_el.value, fD_el.value, tA_el.value, tD_el.value, depTime, scenario, document.getElementById("endAction").value));
   revealed = 1; render();
 };
