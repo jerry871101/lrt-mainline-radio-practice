@@ -88,6 +88,9 @@
   .cms-icon.active-t { color: #4ade80; border-color: #4ade80; }
   .cms-icon.inactive { color: #1e293b; border-color: #1e293b; }
   .cms-icon.fault { color: #ef4444; border-color: #ef4444; animation: blink 1s infinite; }
+  /* 380V 閃電：正常白燈，有動力問題轉黃燈（非紅燈） */
+  .cms-icon.v380-normal { color: #e5e7eb; border-color: #94a3b8; }
+  .cms-icon.v380-fault { color: #fbbf24; border-color: #fbbf24; animation: blink 1s infinite; }
   .door-box { height: 14px; background: #1e293b; border: 1px solid #334155; }
   .door-box.open { background: #3b82f6; }
   .door-box.offline { background: #4b5563; position: relative; }
@@ -114,6 +117,10 @@
 <body>
 
 <div id="cms" class="cms-area">
+  <div id="master-fault-lamp" title="總故障燈（白=正常 / 黃=撒砂或電韌1/4 / 紅=EB或牽引安全迴路或電韌1/2）" style="position:absolute; top:4px; right:10px; z-index:2100; display:flex; flex-direction:row; align-items:center; gap:4px; font-family:Consolas,monospace; pointer-events:none;">
+    <span style="font-size:9px; color:#94a3b8; letter-spacing:1px;">總故障燈</span>
+    <span id="mfl-light" style="width:18px; height:18px; border-radius:50%; background:#e5e7eb; border:2px solid #94a3b8; box-shadow:0 0 8px #e5e7eb;"></span>
+  </div>
   <div class="cms-screen">
     <div id="p-home" class="cms-page active">
       <div class="cms-layout">
@@ -123,20 +130,23 @@
             <span style="color: #4ade80; font-weight: bold; font-size: 16px;">0 <small>km/h</small></span>
             <span id="cms-train-num" style="color: #fff;">101</span>
           </div>
-          <div id="cms-gear" class="cms-gear-display">HB</div>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+            <div id="cms-gear" class="cms-gear-display">HB</div>
+            <div id="btn-mirror-reset" class="nav-btn" style="width: 72px; padding: 4px; font-size: 10px;" onclick="handleCMSClick('後視鏡重置')">後視鏡重置</div>
+          </div>
           <div style="display: grid; grid-template-columns: 1fr; gap: 6px;">
-            <div id="cms-t" class="cms-icon active-t">T</div>
+            <div id="cms-t" class="cms-icon active-t" style="display:none;">T</div>
             <div id="cms-p" class="cms-icon active-t">弓</div>
+            <div id="cms-380v" class="cms-icon v380-normal" style="flex-direction:column; gap:0; line-height:1;" title="380V 供電狀態（白=正常 / 黃=動力問題）"><span style="font-size:18px;">⚡</span><span style="font-size:8px;">380V</span></div>
           </div>
           <div id="atp-hmi" class="atp-hmi">
             <div id="atp-limit" class="atp-limit">20</div>
             <div style="font-size: 11px;">ATP V-MAX</div>
           </div>
-          <div id="btn-mirror-reset" class="nav-btn" style="width: 100px; padding: 4px; font-size: 11px;" onclick="handleCMSClick('後視鏡重置')">後視鏡重置</div>
         </div>
         <div class="cms-train-col" style="border: 1px solid #334155; padding: 6px; background: #111827; display: flex; flex-direction: column; align-items: center; justify-content: center;">
           <!-- 重新設計的 5 節車廂圖示 -->
-          <div id="train-graphic" style="position: relative; width: 120px; height: 230px; background: #000; border: 2px solid #475569; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 12px;">
+          <div id="train-graphic" style="position: relative; width: 120px; height: 230px; margin-right: 16px; background: #000; border: 2px solid #475569; display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 12px;">
             <!-- M1 (Motor) -->
             <div class="train-car" style="height: 42px; border: 1px solid #64748b; position: relative; border-radius: 10px 10px 4px 4px; background: #1e293b;">
               <div id="t-m1-1" class="cms-icon active-t" style="position: absolute; top: 2px; left: 50%; transform: translateX(-50%); width: 14px; height: 14px; font-size: 9px; border-width: 1px;">T</div>
@@ -184,7 +194,7 @@
         <button class="secondary">溫度設定</button>
         <button id="btn-ac-reset" style="background:#334155;" onclick="handleCMSClick('空調重置')">空調重置</button>
       </div></div>
-    <div id="p-door" class="cms-page"><h3>控制 > 車門</h3><div class="row"><button style="background:#475569">車門開啟</button><button style="background:#475569">車門關閉</button></div><div class="row"><button id="btn-door-all" style="background:#334155;" onclick="handleCMSClick('全開全關')">全開全關</button></div></div>
+    <div id="p-door" class="cms-page"><h3>控制 > 車門</h3><div class="row"><button id="btn-door-open" style="background:#334155;" onclick="handleCMSClick('車門全開')">車門全開</button><button id="btn-door-close" style="background:#334155;" onclick="handleCMSClick('車門全關')">車門全關</button></div></div>
     <div id="p-brake" class="cms-page"><h3>控制 > 煞車</h3>
       <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
         <div style="display: flex; align-items: center; gap: 20px;">
@@ -226,7 +236,7 @@
       <div><label>練習情境</label><select id="scenario">
         <option value="normal">正常運轉</option><option value="random_fault">隨機故障排除 (故排)</option><option value="clear">異常處理 (清車)</option><option value="delay_intersection">未能通過路口 (紅燈)</option>
         <optgroup label="故障排除 (故排)">
-          <option value="fault_traction">牽引系統故障</option><option value="fault_brake">煞車系統故障</option><option value="fault_power">供電系統故障</option><option value="fault_door">車門系統故障</option><option value="fault_speed">輔助速限裝置故障</option><option value="fault_ac">空調系統故障</option><option value="fault_restart">清車重開機</option>
+          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake">煞車系統故障</option><option value="fault_power">供電系統故障</option><option value="fault_door">車門系統故障</option><option value="fault_speed">輔助速限裝置故障</option><option value="fault_ac">空調系統故障</option><option value="fault_restart">清車重開機</option>
         </optgroup>
         <optgroup label="營運情境">
           <option value="scenario_point">轉轍器手動扳轉</option><option value="scenario_pei">PEI 旅客對講機</option>
@@ -246,7 +256,8 @@
 <script>
 // 站序對照表（上行：V01→V11→V26，下行反向）
 const STATION_SEQUENCE = ["V01","V02","V03","V04","V05","V06","V07","V08","V09","V10","V11"];
-const BLUE_SEQUENCE    = ["V01","V26","V27","V28"];
+// 藍海線：V01–V09 共線後，於 V09 分歧 → V28 → V27 → V26（終點）
+const BLUE_SEQUENCE    = ["V01","V02","V03","V04","V05","V06","V07","V08","V09","V28","V27","V26"];
 
 function getAdjacentFaultLocation(from, to) {
   // 取得 from 和 to 的站名（去掉月台）
@@ -301,7 +312,7 @@ const AREAS = {
 const ROUTES_MAP = { "V11 2月台-V01 2月台": "11901", "V11 1月台-V01 2月台": "11702", "V01 2月台-V26 1月台": "10601", "V26 1月台-V01 1月台": "10003", "V01 1月台-V11 2月台": "12101", "V01 1月台-V26 1月台": "10401", "V01 1月台-V26 2月台": "10501", "V26 2月台-V01 1月台": "10201", "V26 2月台-V01 2月台": "10301", "V11 1月台-V01 1月台": "11603", "V11 2月台-V01 1月台": "11801", "V01 2月台-V11 1月台": "12201", "V01 2月台-V11 2月台": "12306", "V01 2月台-V26 2月台": "10704", "V26 1月台-V09 2月台": "10101", "V09 2月台-V11 2月台": "12801", "V26 2月台-V09 2月台": "10301" };
 
 const FAULT_DATA = {
-  fault_traction: { name: "牽引系統故障", steps: [
+  fault_traction_tcu: { name: "牽引-CMS T字燈號消失(TCU離線)", steps: [
     { type: "cms", action: "TCU錯誤復位", report: "列車發生牽引系統故障，CMS顯示T字燈號消失，目前無法移動" },
     { type: "emergency", action: "列車自動保護 Bypass", report: "TCU復位無效，確認ATP無異常，列車仍無法移動" },
     { type: "final", report: "已完成按壓應急按鈕「列車自動保護 Bypass」，高架段已切換機廠模式，確認列車可移動。請問OCC是否各站無旅客上下車立即發車，直到時刻表回復準點為止" }
@@ -317,8 +328,8 @@ const FAULT_DATA = {
     { type: "final", report: "已按壓應急按鈕「集電弓降弓 HV OFF」並完成切換ESS模式，確認列車可移動。請問OCC是否執行清車作業並收車回機廠" }
   ]},
   fault_door: { name: "車門系統故障", steps: [
-    { type: "cms", action: "全開全關", report: "列車發生車門系統故障，車門無法關閉" },
-    { type: "emergency", action: "上下車門", report: "CMS全開全關作業無效，至現場確認車門仍無法手動關閉" },
+    { type: "cms", action: "車門全開全關", report: "列車發生車門系統故障，車門無法關閉" },
+    { type: "emergency", action: "上下車門", report: "CMS車門全開全關作業無效，至現場確認車門仍無法手動關閉" },
     { type: "final", report: "已按壓應急按鈕「上下車門」並完成故障車門隔離。請問OCC是否准許發車，行駛至下站後再行清車" }
   ]},
   fault_speed: { name: "輔助速限裝置故障", steps: [
@@ -337,6 +348,7 @@ const FAULT_DATA = {
 };
 
 let pendingAction = null; let currentChunks = []; let revealed = 0;
+let doorSeqStep = 0; // 車門全開全關序列：0=待按全開，1=待按全關
 let completedActions = new Set();
 let activeEmergencyButtons = new Set(); // 已按壓過的應急按鈕，直到重開機才復歸
 let currentBogieIdx = 0; // 0:M1, 1:M3, 2:M5
@@ -346,6 +358,10 @@ let persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false };
 
 function resetFaultState(isRestart) {
   persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false };
+  setMasterFaultLamp(null); // 總故障燈歸位白色（正常）
+  doorSeqStep = 0;
+  // CMS 操作按鈕底色歸位（避免跨情境殘留綠色）
+  [['btn-door-open','#334155'],['btn-door-close','#334155'],['btn-tcu-reset','#334155'],['btn-ac-reset','#334155'],['btn-bogie-isolate','#334155'],['btn-mirror-reset','']].forEach(([id,bg]) => { const b = document.getElementById(id); if (b) b.style.background = bg; });
   // 只有執行清車重開機才復歸應急按鈕
   if (isRestart) activeEmergencyButtons.clear();
 }
@@ -400,13 +416,28 @@ function switchCMSTab(tab) {
   });
 }
 
+// 總故障燈對照（依故障排除手冊 §16）：白=正常 / 黃=撒砂異常或電韌1/4 / 紅=EB1/2或牽引安全迴路或電韌1/2
+// ⚠️ 各情境對應顏色待使用者確認；目前先暫定如下
+const MASTER_FAULT_LAMP = {
+  fault_brake: 'red',              // E1/EB 緊急煞車作動 → 紅
+  fault_traction_redlight: 'red',  // §1.5 無牽引動力，總故障燈亮紅燈 → 紅（待 §1.5 加入後生效）
+};
+function setMasterFaultLamp(scenario) {
+  const palette = { white: ['#e5e7eb', '#94a3b8'], yellow: ['#fbbf24', '#b45309'], red: ['#ef4444', '#b91c1c'] };
+  const [fill, border] = palette[MASTER_FAULT_LAMP[scenario] || 'white'];
+  const el = document.getElementById('mfl-light');
+  if (el) { el.style.background = fill; el.style.borderColor = border; el.style.boxShadow = '0 0 8px ' + fill; }
+}
+
 function updateCMSDisplay(scenario) {
+  setMasterFaultLamp(scenario);
   const gear = document.getElementById("cms-gear");
   const diag = document.getElementById("diag-content");
   const navDiag = document.getElementById("nav-diag");
   gear.innerText = "HB"; gear.className = "cms-gear-display";
   document.getElementById("atp-hmi").className = "atp-hmi"; document.getElementById("atp-limit").innerText = "20";
   ["cms-t","cms-p"].forEach(id => document.getElementById(id).className = "cms-icon active-t");
+  document.getElementById("cms-380v").className = "cms-icon v380-normal"; // 380V 預設白燈
   diag.innerText = "無主動故障紀錄"; navDiag.classList.remove('alert');
   document.querySelectorAll(".door-box").forEach(box => box.className = "door-box");
   document.querySelectorAll(".bogie-unit").forEach(u => u.classList.remove('isolated'));
@@ -415,10 +446,19 @@ function updateCMSDisplay(scenario) {
   ["t-m1-1","t-m1-2","t-m5-1","t-m5-2"].forEach(id => document.getElementById(id).className = "cms-icon active-t");
   ["m1","m3","m5"].forEach(b => document.getElementById(`bogie-status-${b}`).innerText = "");
 
-  if (scenario === "fault_traction") { 
+  if (scenario === "fault_traction_tcu") {
     gear.innerText = "E1"; gear.className = "cms-gear-display fault";
-    document.getElementById("cms-t").className = "cms-icon fault"; 
-    document.getElementById("t-m1-1").className = "cms-icon inactive"; 
+    document.getElementById("cms-t").className = "cms-icon fault";
+    document.getElementById("t-m1-1").className = "cms-icon inactive";
+  }
+  else if (scenario === "fault_traction_redlight") {
+    gear.innerText = "E1"; gear.className = "cms-gear-display fault";
+    diag.innerText = "無牽引動力，總故障燈紅燈（牽引安全迴路作動）"; navDiag.classList.add('alert');
+  }
+  else if (scenario === "fault_traction_380v") {
+    gear.innerText = "E1"; gear.className = "cms-gear-display fault";
+    document.getElementById("cms-380v").className = "cms-icon v380-fault"; // 動力問題 → 黃燈
+    diag.innerText = "380V跳脫、24V離線，列車無法移動"; navDiag.classList.add('alert');
   }
   else if (scenario === "fault_brake") {
     // 持久化故障位置
@@ -451,6 +491,18 @@ function updateCMSDisplay(scenario) {
 }
 
 function handleCMSClick(action) {
+  // 車門全開全關：須先按「車門全開」再按「車門全關」才算完成
+  if (pendingAction === '車門全開全關') {
+    if (action === '車門全開' && doorSeqStep === 0) {
+      document.getElementById('btn-door-open').style.background = "#10b981";
+      doorSeqStep = 1; render(); // 重新渲染以高亮「車門全關」
+    } else if (action === '車門全關' && doorSeqStep === 1) {
+      document.getElementById('btn-door-close').style.background = "#10b981";
+      doorSeqStep = 0; completedActions.add(revealed);
+      setTimeout(() => { pendingAction = null; render(); }, 500);
+    }
+    return;
+  }
   if (pendingAction === action || (action === '隔離轉向架' && pendingAction === '煞車解除')) {
     if (action === 'TCU錯誤復位') {
       document.getElementById('btn-tcu-reset').style.background = "#10b981";
@@ -461,7 +513,6 @@ function handleCMSClick(action) {
       }, 300);
     }
     if (action === '空調重置') document.getElementById('btn-ac-reset').style.background = "#10b981";
-    if (action === '全開全關') document.getElementById('btn-door-all').style.background = "#10b981";
     if (action === '隔離轉向架') { 
       const bNames = ['m1','m3','m5'];
       const selBogie = bNames[currentBogieIdx];
@@ -550,9 +601,21 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
 
     const roll = Math.random();
     if ((scenario === "random_fault" && roll > 0.3) || (scenario.startsWith("fault_"))) {
-      const fKey = scenario.startsWith("fault_") ? scenario : Object.keys(FAULT_DATA)[Math.floor(Math.random()*7)];
-      const faultLoc = getAdjacentFaultLocation(leg.f, leg.t);
-      pts.push({ loc: faultLoc, _isFaultScenario: true, faultKey: fKey, faultName: FAULT_DATA[fKey].name, steps: FAULT_DATA[fKey].steps });
+      const randomPool = ['fault_traction_tcu','fault_brake','fault_power','fault_door','fault_speed','fault_ac','fault_restart'];
+      const fKey = scenario.startsWith("fault_") ? scenario : randomPool[Math.floor(Math.random()*randomPool.length)];
+      // 隨機決定故障發生於「站內(月台)」或「站間途中」（Q2）
+      const atStation = Math.random() < 0.5 && leg.t.includes("月台");
+      const faultLoc = atStation ? leg.t : getAdjacentFaultLocation(leg.f, leg.t);
+      const isBlue = /V2[678]/.test(leg.f + leg.t + tD);
+      if (fKey === 'fault_traction_redlight') {
+        // §1.5 無牽引動力，總故障燈亮紅燈：走自訂分支報話（站內/站間 + 收車流程）
+        pts.push({ loc: faultLoc, _isTractionRedlight: true, _atStation: atStation, _line: isBlue ? 'blue' : 'green', faultKey: 'fault_traction_redlight' });
+      } else if (fKey === 'fault_traction_380v') {
+        // §3.4 380V跳脫：隨機兩結局（TCU有效直接觀察 / 無效→降級→重開機→收車）
+        pts.push({ loc: faultLoc, _isV380: true, _v380Recovered: Math.random() < 0.5, _line: isBlue ? 'blue' : 'green', faultKey: 'fault_traction_380v' });
+      } else {
+        pts.push({ loc: faultLoc, _isFaultScenario: true, _atStation: atStation, faultKey: fKey, faultName: FAULT_DATA[fKey].name, steps: FAULT_DATA[fKey].steps });
+      }
     } else if (scenario === "scenario_point") {
       pts.push({ loc: "V09 1月台", _isPointScenario: true, pointId: "EPM100", side: "左位" });
     } else if (scenario === "scenario_pei") {
@@ -566,6 +629,135 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
   pts.push(finalPt);
 
   return pts;
+}
+
+// §1.5 無牽引動力，總故障燈亮紅燈：依「站內(月台)/站間」分支 + 重開機恢復後收車流程
+function buildRedlightChunks(trainId, cur) {
+  const t = trainId, loc = cur.loc, fk = 'fault_traction_redlight';
+  const isBlue = cur._line === 'blue';
+  const downstream = (loc.match(/往\s*(\S+?)\s*之間/) || [])[1] || '下一站';
+  const chunks = [];
+  // 共同步驟1：回報 + TCU 復位
+  chunks.push({ title: '【故排】無牽引動力 總故障燈亮紅燈 - 步驟1', faultKey: fk, requireAction: 'TCU錯誤復位', lines: [
+    { who: '司機員', text: `${loc}，${t}車呼叫OCC，列車無牽引動力，CMS總故障燈亮紅燈，已確認T字、車門、供電、ATP無其他異常，目前無法移動，OVER` },
+    { who: 'OCC', text: `OCC收到，${t}車，請執行CMS「TCU錯誤復位」，並確認安全煞車已復歸、主控制器離開停機檔，確認列車是否恢復，OVER` },
+    { who: '司機員', text: `${t}車收到，執行CMS「TCU錯誤復位」，確認安全煞車已復歸、主控制器離開停機檔，通話完畢。` },
+  ]});
+  if (cur._atStation) {
+    // 分支甲：站內(月台) → 車門全開全關確認牽引力（先全開後全關）
+    chunks.push({ title: '【故排】站內處置 - 步驟2 車門全開全關確認牽引力', faultKey: fk, requireAction: '車門全開全關', lines: [
+      { who: '司機員', text: `${t}車回報，TCU復位無效，列車仍無牽引動力，OVER` },
+      { who: 'OCC', text: `OCC收到，授權${t}車月台側開門，請執行CMS車門全開全關一次後確認有無牽引，OVER` },
+      { who: '司機員', text: `${t}車收到，月台側開門，執行CMS車門全開全關一次後確認有無牽引，通話完畢。` },
+    ]});
+    chunks.push({ title: '【故排】站內處置 - 步驟3 OCC下達清車重開機', faultKey: fk, requireAction: null, lines: [
+      { who: '司機員', text: `${t}車回報，已完成CMS車門全開全關，確認仍無牽引，OVER` },
+      { who: 'OCC', text: `OCC收到，請${t}車執行清車重開機，完成後回報，OVER` },
+      { who: '司機員', text: `${t}車收到，執行清車重開機，通話完畢。` },
+    ]});
+  } else {
+    // 分支乙：路口/站間 → 降級模式移動至下游站
+    chunks.push({ title: '【故排】站間處置 - 步驟2 降級模式移動至下游站', faultKey: fk, requireAction: '降級模式', lines: [
+      { who: '司機員', text: `${t}車回報，TCU復位無效，列車位於站間無法開門確認，仍無牽引動力，OVER` },
+      { who: 'OCC', text: `OCC收到，請${t}車按壓應急按鈕「降級模式」，將列車移動至下游${downstream}，抵達後回報，OVER` },
+      { who: '司機員', text: `${t}車收到，按壓應急按鈕「降級模式」移動至下游${downstream}，抵達後回報，通話完畢。` },
+    ]});
+    chunks.push({ title: '【故排】站間處置 - 步驟3 OCC下達清車重開機', faultKey: fk, requireAction: null, lines: [
+      { who: '司機員', text: `${t}車回報，已以降級模式行駛至${downstream}，OVER` },
+      { who: 'OCC', text: `OCC收到，請${t}車執行清車重開機，完成後回報，OVER` },
+      { who: '司機員', text: `${t}車收到，執行清車重開機，通話完畢。` },
+    ]});
+  }
+  // 步驟4：重開機恢復（恢復後總故障燈轉白）
+  chunks.push({ title: '【故排】步驟4 重開機恢復', faultKey: 'recovered', requireAction: null, lines: [
+    { who: '司機員', text: `${t}車回報，已完成清車重開機，列車恢復正常，OVER` },
+    { who: 'OCC', text: `OCC收到，${t}車重開機後不載客，請行駛至端點站換端後續行收車，OVER` },
+  ]});
+  // 收車流程（與 §3.4 共用；綠線往V11→2-0交接、藍線往V26→備用車）
+  buildPickupChunks(t, isBlue).forEach(c => chunks.push(c));
+  return chunks;
+}
+
+// 重開機恢復後的收車流程（§1.5 與 §3.4 共用）
+function buildPickupChunks(t, isBlue) {
+  const preEnd = isBlue ? 'V27 1月台' : 'V10 1月台';
+  const dest = isBlue ? 'V26 2月台' : 'V11 2月台';
+  const clearAct = isBlue ? '清車換端' : '清車';
+  const chunks = [];
+  chunks.push({ title: '【收車】手動清除路徑', faultKey: 'recovered', lines: [
+    { who: 'OCC', text: `OCC呼叫${t}車，請${t}車行駛至${preEnd}，抵達後手動清除路徑回報，OVER` },
+    { who: '司機員', text: `${preEnd}，${t}車呼叫OCC，已完成手動清除路徑，OVER` },
+  ]});
+  chunks.push({ title: '【收車】更改目的地・清車', faultKey: 'recovered', lines: [
+    { who: 'OCC', text: `OCC收到，請${t}車更改目的地為${dest}，抵達後執行${clearAct}，完成後回報，OVER` },
+    { who: '司機員', text: `${dest}，${t}車呼叫OCC，已完成${clearAct}，清車人數0人，OVER` },
+  ]});
+  if (isBlue) {
+    chunks.push({ title: '【收車】備用車載客', faultKey: 'recovered', isFinal: true, lines: [
+      { who: 'OCC', text: `OCC收到，請${t}車攜帶原車裝備至V26 1月台備用車，開啟載客模式後回報，OVER` },
+      { who: '司機員', text: `V26 1月台，${t}車呼叫OCC，已攜帶原車裝備至備用車並開啟載客模式，通話完畢。` },
+    ]});
+  } else {
+    chunks.push({ title: '【收車】勤務交接', faultKey: 'recovered', isFinal: true, lines: [
+      { who: 'OCC', text: `OCC收到，請${t}車將列車行駛至臨時駐車位置2-0完成勤務交接後回報，OVER` },
+      { who: '司機員', text: `臨時駐車位置2-0，${t}車呼叫OCC，已完成勤務交接，通話完畢。` },
+    ]});
+  }
+  return chunks;
+}
+
+// §3.4 380V跳脫(24V離線)：隨機兩結局（TCU有效→繼續觀察 / TCU無效→降級→復歸→再降級→端點站清車重開機→收車）
+function buildV380Chunks(trainId, cur) {
+  const t = trainId, loc = cur.loc, fk = 'fault_traction_380v';
+  const isBlue = cur._line === 'blue';
+  const chunks = [];
+  // 步驟1：回報 + TCU 復位
+  chunks.push({ title: '【故排】380V跳脫(24V離線) - 步驟1', faultKey: fk, requireAction: 'TCU錯誤復位', lines: [
+    { who: '司機員', text: `${loc}，${t}車呼叫OCC，列車無牽引動力，CMS顯示380V亮黃燈，監視電源頁面顯示M1 380反灰、M1 24V反灰，目前無法移動，OVER` },
+    { who: 'OCC', text: `OCC收到，${t}車，請執行CMS「TCU錯誤復位」，確認列車是否恢復，OVER` },
+    { who: '司機員', text: `${t}車收到，執行CMS「TCU錯誤復位」，通話完畢。` },
+  ]});
+  if (cur._v380Recovered) {
+    // 結局A：TCU 復位有效，可動車
+    chunks.push({ title: '【故排】TCU復位有效', faultKey: 'recovered', isFinal: true, lines: [
+      { who: '司機員', text: `${t}車回報，已執行TCU錯誤復位，列車恢復正常可移動，OVER` },
+      { who: 'OCC', text: `OCC收到，${t}車，請繼續行駛，持續留意觀察，通話完畢。` },
+    ]});
+    return chunks;
+  }
+  // 結局B：TCU 無效 → 降級模式（高架切機廠）
+  chunks.push({ title: '【故排】TCU無效 - 步驟2 降級模式', faultKey: fk, requireAction: '降級模式', lines: [
+    { who: '司機員', text: `${t}車回報，TCU復位無效，列車仍無法移動，OVER` },
+    { who: 'OCC', text: `OCC收到，請${t}車按壓應急按鈕「降級模式」，高架段切換機廠模式，嘗試移動列車，OVER` },
+    { who: '司機員', text: `${t}車收到，按壓應急按鈕「降級模式」，高架段切換機廠模式，通話完畢。` },
+  ]});
+  // 步驟3：降級可動 → OCC 指示抵下游站復歸降級模式
+  chunks.push({ title: '【故排】步驟3 降級可移動 → 下游站復歸', faultKey: fk, requireAction: null, lines: [
+    { who: '司機員', text: `${t}車回報，已按壓降級模式並切換機廠模式，列車可移動，OVER` },
+    { who: 'OCC', text: `OCC收到，請${t}車抵達下游車站後復歸降級模式，OVER` },
+    { who: '司機員', text: `${t}車收到，抵達下游車站後復歸降級模式，通話完畢。` },
+  ]});
+  // 步驟4：復歸後無法移動 → 再按降級 + 端點站清車重開機
+  chunks.push({ title: '【故排】步驟4 復歸無效 → 端點站清車重開機', faultKey: fk, requireAction: null, lines: [
+    { who: '司機員', text: `${t}車回報，已復歸降級模式，列車無法移動，OVER` },
+    { who: 'OCC', text: `OCC收到，請${t}車再次按壓降級模式，並於端點站清車重開機，OVER` },
+    { who: '司機員', text: `${t}車收到，再次按壓降級模式，於端點站清車重開機，通話完畢。` },
+  ]});
+  // 步驟5：端點站重開機恢復 → OCC 直接下達收車目的地（清車已於端點站完成，不再走 V10/V11 收車）
+  const occPickup = isBlue
+    ? `OCC收到，${t}車重開機後不載客，請攜帶原車裝備至V26 1月台備用車，開啟載客模式後回報，OVER`
+    : `OCC收到，${t}車重開機後不載客，請行駛至臨時駐車位置2-0重交接後回報，OVER`;
+  chunks.push({ title: '【故排】步驟5 端點站重開機恢復', faultKey: 'recovered', requireAction: null, lines: [
+    { who: '司機員', text: `${t}車回報，已於端點站完成清車重開機，列車恢復正常，OVER` },
+    { who: 'OCC', text: occPickup },
+  ]});
+  // 收車回報（終）
+  chunks.push({ title: '【收車】回報', faultKey: 'recovered', isFinal: true, lines: [
+    { who: '司機員', text: isBlue
+      ? `V26 1月台，${t}車呼叫OCC，已攜帶原車裝備至備用車並開啟載客模式，通話完畢。`
+      : `臨時駐車位置2-0，${t}車呼叫OCC，已完成重交接，通話完畢。` },
+  ]});
+  return chunks;
 }
 
 function makeChunks(trainId, pts) {
@@ -590,6 +782,10 @@ function makeChunks(trainId, pts) {
       const reply = `OCC收到，${trainId}車，請於下一站停車待命，已通知相關人員，OVER`;
       const repeat = `${trainId}車收到，於下一站停車待命，通話完畢。`;
       chunks.push({ title: "【營運】PEI 旅客對講機", lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }] });
+    } else if (cur._isTractionRedlight) {
+      buildRedlightChunks(trainId, cur).forEach(c => chunks.push(c));
+    } else if (cur._isV380) {
+      buildV380Chunks(trainId, cur).forEach(c => chunks.push(c));
     } else if (cur._isFaultScenario) {
       cur.steps.forEach((s, idx) => {
         const call = `${cur.loc}，${trainId}車呼叫OCC，${s.report}，OVER`;
@@ -621,8 +817,9 @@ function render() {
   const box = document.getElementById("result"); if (currentChunks.length === 0) return;
   const lastChunk = currentChunks[revealed - 1];
   if (lastChunk && lastChunk.faultKey) updateCMSDisplay(lastChunk.faultKey);
-  const cmsActions = ['TCU錯誤復位', '隔離轉向架', '全開全關', '空調重置', '後視鏡重置'];
+  const cmsActions = ['TCU錯誤復位', '隔離轉向架', '車門全開全關', '空調重置', '後視鏡重置'];
   pendingAction = (lastChunk && !completedActions.has(revealed)) ? lastChunk.requireAction : null;
+  if (pendingAction !== '車門全開全關') doorSeqStep = 0; // 離開車門步驟時重置序列
   document.querySelectorAll('.sub-btn, .sub-nav-btn, .nav-btn').forEach(b => b.classList.remove('highlight'));
   if (pendingAction) {
     if (cmsActions.includes(pendingAction)) {
@@ -630,7 +827,7 @@ function render() {
       if (pendingAction === '後視鏡重置') document.getElementById('btn-mirror-reset').classList.add('highlight');
       if (pendingAction === '空調重置') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-ac').classList.add('highlight'); document.getElementById('btn-ac-reset').classList.add('highlight'); }
       if (pendingAction === '隔離轉向架') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-brake').classList.add('highlight'); document.getElementById('btn-bogie-isolate').classList.add('highlight'); }
-      if (pendingAction === '全開全關') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-door').classList.add('highlight'); document.getElementById('btn-door-all').classList.add('highlight'); }
+      if (pendingAction === '車門全開全關') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-door').classList.add('highlight'); document.getElementById(doorSeqStep === 0 ? 'btn-door-open' : 'btn-door-close').classList.add('highlight'); }
       updateEmergencyPanel(null);
     } else updateEmergencyPanel(pendingAction);
   } else updateEmergencyPanel(null);
