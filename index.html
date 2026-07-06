@@ -275,7 +275,7 @@ function getAdjacentFaultLocation(from, to) {
   const ti = seq.indexOf(toSt);
 
   // 若找不到站序（如路口、機廠），fallback 用原本的描述
-  if (fi === -1 || ti === -1) return `${from} 往 ${to} 途中`;
+  if (fi === -1 || ti === -1) return `${from}往${to}`;
 
   const direction = ti > fi ? 1 : -1;
   // 從 from 開始往 to 方向，收集途中的站（不含起終點）
@@ -286,7 +286,7 @@ function getAdjacentFaultLocation(from, to) {
 
   // 加入 from 的下一站（司機員最容易報告的相鄰段）
   const nextSt = seq[fi + direction];
-  if (!nextSt) return `${from} 往 ${to} 途中`;
+  if (!nextSt) return `${from}往${to}`;
 
   // 在 from 與 from下一站 之間隨機插入故障，或在中間某站間插入
   const candidates = [];
@@ -299,7 +299,7 @@ function getAdjacentFaultLocation(from, to) {
     candidates.push({ a: cur, b: nxt });
   }
   const pick = candidates[Math.floor(Math.random() * candidates.length)];
-  return `${pick.a} 往 ${pick.b} 之間途中`;
+  return `${pick.a}往${pick.b}`;
 }
 
 const AREAS = {
@@ -619,10 +619,11 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
     } else if (scenario === "scenario_point") {
       pts.push({ loc: "V09 1月台", _isPointScenario: true, pointId: "EPM100", side: "左位" });
     } else if (scenario === "scenario_pei") {
-      pts.push({ loc: `${leg.f} 往 ${leg.t} 途中`, _isPEIScenario: true });
+      pts.push({ loc: getAdjacentFaultLocation(leg.f, leg.t), _isPEIScenario: true });
     } else if (scenario === "delay_intersection") {
       const j = AREAS.intersections.items[Math.floor(Math.random()*18)];
-      pts.push({ loc: j, _isDelayScenario: true, isUplink: (leg.t.includes("V11")||leg.t.includes("V26")), report: `稍早於${leg.f}等候旅客上下車，未能通過${j}，待下一輪號誌開通後再通過路口` });
+      const jUp = (leg.t.includes("V11")||leg.t.includes("V26"));
+      pts.push({ loc: j + (jUp ? '上行' : '下行'), _isDelayScenario: true, isUplink: jUp, report: `稍早於${leg.f}等候旅客上下車，未能通過${j}，待下一輪號誌開通後再通過路口` });
     }
   }
   const finalPt = (tA === "depot") ? { loc: tD, report: `已停妥${tD}${tD.includes("2-0")?"，完成交接":"，Tetra轉G01完成"}`, isFinal: true } : { loc: tD, report: `已完成換端，接收建議路徑${ROUTES_MAP[tD+'-'+fD] || '[路徑號]'}，確認前方號誌開通，依時刻表發車`, isFinal: true };
@@ -635,7 +636,7 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
 function buildRedlightChunks(trainId, cur) {
   const t = trainId, loc = cur.loc, fk = 'fault_traction_redlight';
   const isBlue = cur._line === 'blue';
-  const downstream = (loc.match(/往\s*(\S+?)\s*之間/) || [])[1] || '下一站';
+  const downstream = (loc.match(/往(V\d+)/) || [])[1] || '下一站';
   const chunks = [];
   // 共同步驟1：回報 + TCU 復位
   chunks.push({ title: '【故排】無牽引動力 總故障燈亮紅燈 - 步驟1', faultKey: fk, requireAction: 'TCU錯誤復位', lines: [
