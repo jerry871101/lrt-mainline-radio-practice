@@ -679,28 +679,31 @@ function buildRedlightChunks(trainId, cur) {
   return chunks;
 }
 
-// 重開機恢復後的收車流程（§1.5 與 §3.4 共用）
+// 重開機/故排恢復後的收車尾段（所有故排共用；收車點只有 V11綠→2-0、V26藍→換藍備）
 function buildPickupChunks(t, isBlue) {
-  const preEnd = isBlue ? 'V27 1月台' : 'V10 1月台';
-  const dest = isBlue ? 'V26 2月台' : 'V11 2月台';
-  const clearAct = isBlue ? '清車換端' : '清車';
   const chunks = [];
-  chunks.push({ title: '【收車】手動清除路徑', faultKey: 'recovered', lines: [
-    { who: 'OCC', text: `OCC呼叫${t}車，請${t}車行駛至${preEnd}，抵達後手動清除路徑回報，OVER` },
-    { who: '司機員', text: `${preEnd}，${t}車呼叫OCC，已完成手動清除路徑，OVER` },
-  ]});
-  chunks.push({ title: '【收車】更改目的地・清車', faultKey: 'recovered', lines: [
-    { who: 'OCC', text: `OCC收到，請${t}車更改目的地為${dest}，抵達後執行${clearAct}，完成後回報，OVER` },
-    { who: '司機員', text: `${dest}，${t}車呼叫OCC，已完成${clearAct}，清車人數0人，OVER` },
-  ]});
   if (isBlue) {
-    chunks.push({ title: '【收車】備用車載客', faultKey: 'recovered', isFinal: true, lines: [
-      { who: 'OCC', text: `OCC收到，請${t}車攜帶原車裝備至V26 1月台備用車，開啟載客模式後回報，OVER` },
-      { who: '司機員', text: `V26 1月台，${t}車呼叫OCC，已攜帶原車裝備至備用車並開啟載客模式，通話完畢。` },
+    // 藍線：無清除路徑步驟（目的地本就是 V26 1月台）；V26 1月台清車換端「故障車停此」→ 轉乘 V26 2月台藍海備用車
+    chunks.push({ title: '【收車】V26清車換端', faultKey: 'recovered', lines: [
+      { who: 'OCC', text: `OCC呼叫${t}車，請${t}車稍後抵達V26 1月台執行清車換端，完成後回報，OVER` },
+      { who: '司機員', text: `V26 1月台，${t}車呼叫OCC，已完成清車換端，清車人數0人，OVER` },
+    ]});
+    chunks.push({ title: '【收車】轉乘藍海備用車', faultKey: 'recovered', isFinal: true, lines: [
+      { who: 'OCC', text: `OCC收到，請${t}車攜帶原車裝備至V26 2月台藍海備用車，開啟載客模式後回報，OVER` },
+      { who: '司機員', text: `V26 2月台，${t}車呼叫OCC，已攜帶原車裝備至藍海備用車並開啟載客模式，通話完畢。` },
     ]});
   } else {
+    // 綠線：V10 1月台手動清除路徑 → 變更目的地 V11 2月台執行清車 → 臨時駐車位置 2-0 交接
+    chunks.push({ title: '【收車】手動清除路徑', faultKey: 'recovered', lines: [
+      { who: 'OCC', text: `OCC呼叫${t}車，請${t}車行駛至V10 1月台，抵達後手動清除路徑回報，OVER` },
+      { who: '司機員', text: `V10 1月台，${t}車呼叫OCC，已完成手動清除路徑，OVER` },
+    ]});
+    chunks.push({ title: '【收車】變更目的地・清車', faultKey: 'recovered', lines: [
+      { who: 'OCC', text: `OCC收到，請${t}車變更目的地為V11 2月台，抵達後執行清車，完成後回報，OVER` },
+      { who: '司機員', text: `V11 2月台，${t}車呼叫OCC，已完成清車，清車人數0人，OVER` },
+    ]});
     chunks.push({ title: '【收車】勤務交接', faultKey: 'recovered', isFinal: true, lines: [
-      { who: 'OCC', text: `OCC收到，請${t}車將列車行駛至臨時駐車位置2-0完成勤務交接後回報，OVER` },
+      { who: 'OCC', text: `OCC收到，請${t}車確認前方號誌開通後，行駛至臨時駐車位置2-0完成勤務交接後回報，OVER` },
       { who: '司機員', text: `臨時駐車位置2-0，${t}車呼叫OCC，已完成勤務交接，通話完畢。` },
     ]});
   }
