@@ -124,6 +124,13 @@
 - **已測**：Node 抽真實函式跑 4 條路線 × 40 次，格式正確、無「之間途中」殘留、downstream 正則 OK。⚠ 尚未跑瀏覽器 Playwright（留待 SE 台詞完成一起走查 render/console）。
 - 規則已寫進 `報話通用規則.md` §3。
 
+**🚧 實作進度（2026-07-07 開工）：**
+- ✅ **STAGE 1**：`buildPickupChunks` 收車 helper 改新規則（藍線改「V26 1月台清車換端→V26 2月台藍海備用車」、移除 V27 清除路徑；綠線維持）。**同時修正了 §1.5 的藍線收車**。
+- ✅ **STAGE 3**：§3.4 `buildV380Chunks` 結局B 改呼叫 `buildPickupChunks`（走完整流程）。
+- ✅ **STAGE 2 完成**：拆 3 下拉（`fault_brake_err/se/2plus`）＋buildPoints 注入（子類型/轉向架/線別/方向＋設 persistentFault）＋新 `buildBrakeChunks`＋`updateCMSDisplay` 支援單一/全部/兩組＋makeChunks dispatch＋persistentFault 加 bogies/subtype 欄位。
+- ✅ **jsdom 白箱實測全綠**：台詞矩陣(4子型×綠藍上下行)零錯、注入→對話→CMS標籤 24/0、§1.5/§3.4 回歸 14/0、0 console 錯誤。
+- ⚠ **唯一未自動化**：實際 UI 點擊流程（「繼續」按鈕、單一ERR/SE 的 CMS 隔離點擊解鎖）＋視覺截圖。隔離互動沿用既有已測程式碼、風險低。**建議使用者線上點一次三種煞車情境確認**（或下次用 chromium 補跑）。
+
 **🛠️ 實作計畫（台詞已全定稿，照此寫程式）：**
 1. **下拉**：line 237-239 把 `fault_brake` 拆成 3 個 option：`fault_brake_err`（單一ERR,隔離）／`fault_brake_se`（隨機單一SE=隔離／全部SE=重置→降弓重開機）／`fault_brake_2plus`（兩組ERR,降弓重開機）。randomPool（line 604）也對應調整。
 2. **注入**：buildPoints 故障點（line ~617）決定並存於 pt：故障類型、轉向架（單一=M1/M3/M5挑1；兩組=挑2）、tag(ERR/SE)、line(綠/藍,由leg判)、direction(上/下行,由leg朝V01=下行)。`persistentFault.bogie/tag` 由此注入（取代 line 466 惰性亂數）。
@@ -140,7 +147,7 @@
 7. **§3.4** `buildV380Chunks`（line 711）結局B 改呼叫 `buildCollectionChunks` 走完整流程；改後**重測 §3.4**。
 8. **Playwright**：裝 chromium，逐一走查 3 下拉 ×（綠/藍 上/下行）＋SE隨機兩型：0 console error、台詞正確、ERR CMS隔離可解鎖。
 
-**▶️ 下次從這裡繼續**：✅ 煞車三下拉台詞＋位置格式全定稿。**只剩「實作」**：照上方「🛠️ 實作計畫」8 步寫程式（自訂 builder＋共用收車 helper＋拆下拉＋改 §3.4）→ Playwright 實測。尚未寫任何煞車程式碼。
+**▶️ 下次從這裡繼續**：✅ 煞車系統（3 下拉／ERR／SE／兩組以上）程式＋jsdom 實測全完成，§3.4 已改完整流程。待辦：(1) 使用者線上點一次三種煞車情境（尤其單一ERR/SE 的 CMS 隔離解鎖）確認 UI；(2) 確認 OK 後把煞車逐句台詞細節移到 `工作日誌封存.md`、精簡本檔；(3) 進下一個情境「供電系統故障」（❌ 尚未討論）。
 
 ---
 
@@ -155,7 +162,7 @@
 | 牽引 §1.1（TCU離線） | ✅ 定稿＋實測 | 見封存 |
 | 牽引 §1.5（總故障燈紅） | ✅ 定稿＋實測 | 見封存 |
 | 牽引 §3.4（380V跳脫） | ✅ 定稿＋實測 | 見封存 |
-| 煞車系統故障 | ⏳ 進行中 | 見上方「進行中」 |
+| 煞車系統故障 | ✅ 定稿＋實作＋jsdom實測 | 3下拉(ERR/SE/兩組)；待使用者線上點一次確認 |
 | 供電系統故障 | ❌ 尚未討論 | |
 | 車門系統故障 | ❌ 尚未討論 | |
 | 輔助速限裝置故障 | ❌ 尚未討論 | |

@@ -236,7 +236,7 @@
       <div><label>練習情境</label><select id="scenario">
         <option value="normal">正常運轉</option><option value="random_fault">隨機故障排除 (故排)</option><option value="clear">異常處理 (清車)</option><option value="delay_intersection">未能通過路口 (紅燈)</option>
         <optgroup label="故障排除 (故排)">
-          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake">煞車系統故障</option><option value="fault_power">供電系統故障</option><option value="fault_door">車門系統故障</option><option value="fault_speed">輔助速限裝置故障</option><option value="fault_ac">空調系統故障</option><option value="fault_restart">清車重開機</option>
+          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_power">供電系統故障</option><option value="fault_door">車門系統故障</option><option value="fault_speed">輔助速限裝置故障</option><option value="fault_ac">空調系統故障</option><option value="fault_restart">清車重開機</option>
         </optgroup>
         <optgroup label="營運情境">
           <option value="scenario_point">轉轍器手動扳轉</option><option value="scenario_pei">PEI 旅客對講機</option>
@@ -354,10 +354,10 @@ let activeEmergencyButtons = new Set(); // 已按壓過的應急按鈕，直到�
 let currentBogieIdx = 0; // 0:M1, 1:M3, 2:M5
 let isACOff = false;
 let isFlangeLubOn = false;
-let persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false };
+let persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false, bogies: null, subtype: null };
 
 function resetFaultState(isRestart) {
-  persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false };
+  persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false, bogies: null, subtype: null };
   setMasterFaultLamp(null); // 總故障燈歸位白色（正常）
   doorSeqStep = 0;
   // CMS 操作按鈕底色歸位（避免跨情境殘留綠色）
@@ -461,24 +461,30 @@ function updateCMSDisplay(scenario) {
     diag.innerText = "380V跳脫、24V離線，列車無法移動"; navDiag.classList.add('alert');
   }
   else if (scenario === "fault_brake") {
-    // 持久化故障位置
-    if (!persistentFault.bogie) {
+    // 保險：若未由 buildPoints 注入才惰性給單一 ERR
+    if (!persistentFault.subtype) {
+      persistentFault.subtype = 'err1';
       persistentFault.bogie = ["m1","m3","m5"][Math.floor(Math.random()*3)];
-      persistentFault.tag = Math.random() > 0.5 ? "ERR" : "SE";
+      persistentFault.bogies = [persistentFault.bogie];
+      persistentFault.tag = "ERR";
     }
-    if (persistentFault.isolated) {
-      // 已隔離故障轉向架：列車回復 HB 可移動，但該轉向架故障標籤(ERR/SE)持續顯示
+    const single = persistentFault.subtype === 'err1' || persistentFault.subtype === 'se1';
+    const gearText = persistentFault.tag === 'SE' ? 'SE' : 'E1';
+    if (single && persistentFault.isolated) {
+      // 已隔離：列車回復 HB 可移動，該轉向架標籤持續顯示（直到重開機）
       gear.innerText = "HB"; gear.className = "cms-gear-display";
       document.getElementById("cms-t").className = "cms-icon active-t";
       const bu = document.getElementById('bogie-' + persistentFault.bogie.toUpperCase());
       if (bu) bu.classList.add('isolated');
     } else {
-      gear.innerText = "E1"; gear.className = "cms-gear-display fault";
+      gear.innerText = gearText; gear.className = "cms-gear-display fault";
       document.getElementById("cms-t").className = "cms-icon fault";
     }
-    if (persistentFault.tag) {
-      document.getElementById(`bogie-status-${persistentFault.bogie}`).innerText = persistentFault.tag;
-    }
+    // 顯示所有故障轉向架標籤（單一=1組；全部SE=3組；兩組ERR=2組）
+    (persistentFault.bogies || []).forEach(b => {
+      const el = document.getElementById(`bogie-status-${b}`);
+      if (el) el.innerText = persistentFault.tag;
+    });
   }
   else if (scenario === "fault_power") { document.getElementById("cms-p").className = "cms-icon fault"; }
   else if (scenario === "fault_door") { document.getElementById("d-m2l").className = "door-box offline"; document.getElementById("d-m4l").className = "door-box offline"; }
@@ -613,6 +619,25 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
       } else if (fKey === 'fault_traction_380v') {
         // §3.4 380V跳脫：隨機兩結局（TCU有效直接觀察 / 無效→降級→重開機→收車）
         pts.push({ loc: faultLoc, _isV380: true, _v380Recovered: Math.random() < 0.5, _line: isBlue ? 'blue' : 'green', faultKey: 'fault_traction_380v' });
+      } else if (fKey === 'fault_brake' || fKey.indexOf('fault_brake_') === 0) {
+        // 煞車系統故障：站間發生。子類型 err1(單一ERR)/se1(單一SE)/seAll(全部SE)/err2plus(兩組以上ERR)
+        let type;
+        if (fKey === 'fault_brake_err') type = 'err1';
+        else if (fKey === 'fault_brake_2plus') type = 'err2plus';
+        else if (fKey === 'fault_brake_se') type = Math.random() < 0.5 ? 'se1' : 'seAll';
+        else type = ['err1','se1','seAll','err2plus'][Math.floor(Math.random()*4)]; // 隨機池
+        const bpool = ['m1','m3','m5'];
+        let bogies;
+        if (type === 'seAll') bogies = bpool.slice();
+        else if (type === 'err2plus') { bogies = bpool.slice(); bogies.splice(Math.floor(Math.random()*3), 1); } // 隨機 2 組
+        else bogies = [bpool[Math.floor(Math.random()*3)]]; // 單一
+        const uplink = leg.t.includes('V11') || leg.t.includes('V26');
+        persistentFault.bogies = bogies;
+        persistentFault.bogie = (type === 'err1' || type === 'se1') ? bogies[0] : null;
+        persistentFault.tag = (type === 'se1' || type === 'seAll') ? 'SE' : 'ERR';
+        persistentFault.subtype = type;
+        // 煞車一律站間發生 → 用站間 loc（不用月台）
+        pts.push({ loc: getAdjacentFaultLocation(leg.f, leg.t), _isBrakeScenario: true, _brakeType: type, _bogies: bogies, _isBlue: isBlue, _uplink: uplink, faultKey: 'fault_brake' });
       } else {
         pts.push({ loc: faultLoc, _isFaultScenario: true, _atStation: atStation, faultKey: fKey, faultName: FAULT_DATA[fKey].name, steps: FAULT_DATA[fKey].steps });
       }
@@ -747,20 +772,81 @@ function buildV380Chunks(trainId, cur) {
     { who: 'OCC', text: `OCC收到，請${t}車再次按壓降級模式，並於端點站清車重開機，OVER` },
     { who: '司機員', text: `${t}車收到，再次按壓降級模式，於端點站清車重開機，通話完畢。` },
   ]});
-  // 步驟5：端點站重開機恢復 → OCC 直接下達收車目的地（清車已於端點站完成，不再走 V10/V11 收車）
-  const occPickup = isBlue
-    ? `OCC收到，${t}車重開機後不載客，請攜帶原車裝備至V26 1月台備用車，開啟載客模式後回報，OVER`
-    : `OCC收到，${t}車重開機後不載客，請行駛至臨時駐車位置2-0重交接後回報，OVER`;
+  // 步驟5：端點站重開機恢復 → 走完整收車流程（2026-07-07 改：所有故障清車一律走完整流程）
   chunks.push({ title: '【故排】步驟5 端點站重開機恢復', faultKey: 'recovered', requireAction: null, lines: [
     { who: '司機員', text: `${t}車回報，已於端點站完成清車重開機，列車恢復正常，OVER` },
-    { who: 'OCC', text: occPickup },
+    { who: 'OCC', text: `OCC收到，${t}車重開機後不載客，續行收車，OVER` },
   ]});
-  // 收車回報（終）
-  chunks.push({ title: '【收車】回報', faultKey: 'recovered', isFinal: true, lines: [
-    { who: '司機員', text: isBlue
-      ? `V26 1月台，${t}車呼叫OCC，已攜帶原車裝備至備用車並開啟載客模式，通話完畢。`
-      : `臨時駐車位置2-0，${t}車呼叫OCC，已完成重交接，通話完畢。` },
+  // 收車尾段（完整流程，與 §1.5、煞車共用）
+  buildPickupChunks(t, isBlue).forEach(c => chunks.push(c));
+  return chunks;
+}
+
+// 煞車系統故障：單一轉向架 ERR/SE→CMS隔離；全部SE→重置安全煞車+降弓重開機；兩組以上ERR→降弓重開機。皆接完整收車。
+function buildBrakeChunks(trainId, cur) {
+  const t = trainId, loc = cur.loc, fk = 'fault_brake';
+  const isBlue = cur._isBlue;
+  const downlink = !cur._uplink; // 下行＝往 V01
+  const bogies = (cur._bogies || []).map(b => b.toUpperCase()).join('、');
+  const type = cur._brakeType;
+  const chunks = [];
+
+  if (type === 'err1' || type === 'se1') {
+    // 單一轉向架 ERR / SE → CMS 隔離轉向架（司機員於隔離時自按煞車解除）
+    const tag = type === 'se1' ? 'SE' : 'ERR';
+    const cmsShow = type === 'se1' ? 'SE' : 'E1';
+    chunks.push({ title: `【故排】煞車-單一轉向架${tag} 步驟1 隔離`, faultKey: fk, requireAction: '隔離轉向架', lines: [
+      { who: '司機員', text: `${loc}，${t}車呼叫OCC，目前${bogies}轉向架${tag}，CMS顯示${cmsShow}，列車無法移動，OVER` },
+      { who: 'OCC', text: `OCC收到，${t}車，請執行CMS「隔離轉向架」作業，確認列車是否恢復，OVER` },
+      { who: '司機員', text: `${t}車收到，執行CMS「隔離轉向架」作業，通話完畢。` },
+    ]});
+    chunks.push({ title: '【故排】煞車 步驟2 可移動', faultKey: 'recovered', requireAction: null, lines: [
+      { who: '司機員', text: `${t}車回報，已完成隔離${bogies}轉向架並按壓煞車解除，列車可移動，OVER` },
+    ]});
+    if (downlink) {
+      // 下行尚未重開機 → 先到 V02 2月台，再至 V01 清車不載客重開機，發車後接收車尾段
+      chunks.push({ title: '【故排】煞車 下行 續行V02', faultKey: 'recovered', requireAction: null, lines: [
+        { who: 'OCC', text: `OCC收到，請${t}車繼續行駛，抵達V02 2月台回報，OVER` },
+        { who: '司機員', text: `V02 2月台，${t}車呼叫OCC，已抵達，OVER` },
+      ]});
+      chunks.push({ title: '【故排】煞車 下行 V01清車不載客重開機', faultKey: 'recovered', requireAction: null, lines: [
+        { who: 'OCC', text: `OCC收到，請${t}車抵達V01後執行清車不載客重開機作業，完成後回報，OVER` },
+        { who: '司機員', text: `V01，${t}車呼叫OCC，已完成清車不載客重開機，列車恢復正常，OVER` },
+      ]});
+      chunks.push({ title: '【故排】煞車 下行 發車', faultKey: 'recovered', requireAction: null, lines: [
+        { who: 'OCC', text: `OCC收到，請${t}車確認前方號誌開通後依時刻表發車，續行收車，OVER` },
+      ]});
+    }
+    buildPickupChunks(t, isBlue).forEach(c => chunks.push(c));
+    return chunks;
+  }
+
+  if (type === 'seAll') {
+    // 全部轉向架 SE：重置安全煞車 → 無效 → 播廣播 + 降弓就地重開機
+    chunks.push({ title: '【故排】煞車-全部SE 步驟1 重置安全煞車', faultKey: fk, requireAction: null, lines: [
+      { who: '司機員', text: `${loc}，${t}車呼叫OCC，目前全部轉向架SE、檔位顯示SE，列車無法移動，OVER` },
+      { who: 'OCC', text: `OCC收到，${t}車，請執行重置安全煞車，確認列車是否恢復，OVER` },
+      { who: '司機員', text: `${t}車收到，執行重置安全煞車，通話完畢。` },
+    ]});
+    chunks.push({ title: '【故排】煞車-全部SE 步驟2 降弓重開機', faultKey: fk, requireAction: null, lines: [
+      { who: '司機員', text: `${t}車回報，已執行重置安全煞車，仍無法移動，OVER` },
+      { who: 'OCC', text: `OCC收到，請${t}車播放預錄廣播告知旅客相關資訊後，執行降弓重開機，確認列車是否恢復，OVER` },
+      { who: '司機員', text: `${t}車收到，播放預錄廣播告知旅客後執行降弓重開機，通話完畢。` },
+    ]});
+  } else {
+    // 兩組以上轉向架 ERR：直接播廣播 + 降弓就地重開機
+    chunks.push({ title: '【故排】煞車-兩組以上ERR 步驟1 降弓重開機', faultKey: fk, requireAction: null, lines: [
+      { who: '司機員', text: `${loc}，${t}車呼叫OCC，目前${bogies}轉向架ERR，CMS顯示E1，列車無法移動，OVER` },
+      { who: 'OCC', text: `OCC收到，${t}車，請播放預錄廣播告知旅客相關資訊後，執行降弓重開機，確認列車是否恢復，OVER` },
+      { who: '司機員', text: `${t}車收到，播放預錄廣播告知旅客後執行降弓重開機，通話完畢。` },
+    ]});
+  }
+  // 就地降弓重開機恢復 → 收車（已重開機，端點不再重開機；下行至 V01 僅正常換端＝無台詞）
+  chunks.push({ title: '【故排】降弓重開機恢復', faultKey: 'recovered', requireAction: null, lines: [
+    { who: '司機員', text: `${t}車回報，已完成降弓重開機，列車恢復正常、可移動，OVER` },
+    { who: 'OCC', text: `OCC收到，${t}車重開機後不載客，續行收車，OVER` },
   ]});
+  buildPickupChunks(t, isBlue).forEach(c => chunks.push(c));
   return chunks;
 }
 
@@ -790,6 +876,8 @@ function makeChunks(trainId, pts) {
       buildRedlightChunks(trainId, cur).forEach(c => chunks.push(c));
     } else if (cur._isV380) {
       buildV380Chunks(trainId, cur).forEach(c => chunks.push(c));
+    } else if (cur._isBrakeScenario) {
+      buildBrakeChunks(trainId, cur).forEach(c => chunks.push(c));
     } else if (cur._isFaultScenario) {
       cur.steps.forEach((s, idx) => {
         const call = `${cur.loc}，${trainId}車呼叫OCC，${s.report}，OVER`;
