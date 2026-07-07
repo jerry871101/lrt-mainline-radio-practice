@@ -925,9 +925,21 @@ function render() {
   const cmsActions = ['TCU錯誤復位', '隔離轉向架', '車門全開全關', '空調重置', '後視鏡重置'];
   pendingAction = (lastChunk && !completedActions.has(revealed)) ? lastChunk.requireAction : null;
   if (pendingAction !== '車門全開全關') doorSeqStep = 0; // 離開車門步驟時重置序列
+  if (pendingAction !== '隔離並煞車解除') brakeReleaseStep = 0; // 離開複合步驟時重置
   document.querySelectorAll('.sub-btn, .sub-nav-btn, .nav-btn').forEach(b => b.classList.remove('highlight'));
   if (pendingAction) {
-    if (cmsActions.includes(pendingAction)) {
+    if (pendingAction === '隔離並煞車解除') {
+      if (brakeReleaseStep === 0) {
+        // 子步驟0：高亮 CMS 隔離轉向架
+        document.getElementById('nav-control').classList.add('alert');
+        document.getElementById('btn-sub-brake').classList.add('highlight');
+        document.getElementById('btn-bogie-isolate').classList.add('highlight');
+        updateEmergencyPanel(null);
+      } else {
+        // 子步驟1：隔離完成 → 跳出應急按鈕「煞車解除」
+        updateEmergencyPanel('煞車解除');
+      }
+    } else if (cmsActions.includes(pendingAction)) {
       if (pendingAction === 'TCU錯誤復位') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-propulsion').classList.add('highlight'); document.getElementById('btn-tcu-reset').classList.add('highlight'); }
       if (pendingAction === '後視鏡重置') document.getElementById('btn-mirror-reset').classList.add('highlight');
       if (pendingAction === '空調重置') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-ac').classList.add('highlight'); document.getElementById('btn-ac-reset').classList.add('highlight'); }
