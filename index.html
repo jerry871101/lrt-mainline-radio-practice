@@ -349,6 +349,7 @@ const FAULT_DATA = {
 
 let pendingAction = null; let currentChunks = []; let revealed = 0;
 let doorSeqStep = 0; // 車門全開全關序列：0=待按全開，1=待按全關
+let brakeReleaseStep = 0; // 單一ERR/SE 複合動作：0=待CMS隔離，1=待按煞車解除
 let completedActions = new Set();
 let activeEmergencyButtons = new Set(); // 已按壓過的應急按鈕，直到重開機才復歸
 let currentBogieIdx = 0; // 0:M1, 1:M3, 2:M5
@@ -360,6 +361,7 @@ function resetFaultState(isRestart) {
   persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false, bogies: null, subtype: null };
   setMasterFaultLamp(null); // 總故障燈歸位白色（正常）
   doorSeqStep = 0;
+  brakeReleaseStep = 0;
   // CMS 操作按鈕底色歸位（避免跨情境殘留綠色）
   [['btn-door-open','#334155'],['btn-door-close','#334155'],['btn-tcu-reset','#334155'],['btn-ac-reset','#334155'],['btn-bogie-isolate','#334155'],['btn-mirror-reset','']].forEach(([id,bg]) => { const b = document.getElementById(id); if (b) b.style.background = bg; });
   // 只有執行清車重開機才復歸應急按鈕
@@ -509,7 +511,7 @@ function handleCMSClick(action) {
     }
     return;
   }
-  if (pendingAction === action || (action === '隔離轉向架' && pendingAction === '煞車解除')) {
+  if (pendingAction === action || (action === '隔離轉向架' && (pendingAction === '煞車解除' || pendingAction === '隔離並煞車解除'))) {
     if (action === 'TCU錯誤復位') {
       document.getElementById('btn-tcu-reset').style.background = "#10b981";
       setTimeout(() => {
@@ -530,7 +532,13 @@ function handleCMSClick(action) {
         document.getElementById("cms-gear").className = "cms-gear-display";
         document.getElementById("cms-t").className = "cms-icon active-t";
         document.getElementById('btn-bogie-isolate').style.background = "#10b981";
-        completedActions.add(revealed); setTimeout(() => { pendingAction = null; render(); }, 500);
+        if (pendingAction === '隔離並煞車解除') {
+          // 複合動作：隔離完成 → 尚須按應急按鈕「煞車解除」才算完成
+          brakeReleaseStep = 1;
+          setTimeout(() => render(), 500); // 重繪跳出「煞車解除」紅鈕
+        } else {
+          completedActions.add(revealed); setTimeout(() => { pendingAction = null; render(); }, 500);
+        }
       }
       // 隔離錯誤轉向架：不完成步驟，維持 E1 故障，使用者可切換其他轉向架重試
       return;
@@ -543,7 +551,7 @@ function handleCMSClick(action) {
 }
 
 function handleEmergencyClick(action) {
-  if (pendingAction === action) {
+  if (pendingAction === action || (action === '煞車解除' && pendingAction === '隔離並煞車解除' && brakeReleaseStep === 1)) {
     activeEmergencyButtons.add(action); // 記錄已按壓的應急按鈕
     completedActions.add(revealed);
     // 若是清車重開機按下降級模式，觸發復歸
@@ -553,6 +561,7 @@ function handleEmergencyClick(action) {
         resetFaultState(true); // 清車重開機：復歸所有應急按鈕
       }
     }
+    brakeReleaseStep = 0;
     pendingAction = null;
     render();
   }
@@ -798,13 +807,13 @@ function buildBrakeChunks(trainId, cur) {
     // 單一轉向架 ERR / SE → CMS 隔離轉向架（司機員於隔離時自按煞車解除）
     const tag = type === 'se1' ? 'SE' : 'ERR';
     const cmsShow = type === 'se1' ? 'SE' : 'E1';
-    chunks.push({ title: `【故排】煞車-單一轉向架${tag} 步驟1 隔離`, faultKey: fk, requireAction: '隔離轉向架', lines: [
+    // 複合動作：CMS 隔離轉向架 → 再按應急按鈕「煞車解除」，兩動作同一步都完成才算故排完成
+    chunks.push({ title: `【故排】煞車-單一轉向架${tag} 隔離＋煞車解除`, faultKey: fk, requireAction: '隔離並煞車解除', lines: [
       { who: '司機員', text: `${loc}，${t}車呼叫OCC，目前${bogies}轉向架${tag}，CMS顯示${cmsShow}，列車無法移動，OVER` },
       { who: 'OCC', text: `OCC收到，${t}車，請執行CMS「隔離轉向架」作業，確認列車是否恢復，OVER` },
       { who: '司機員', text: `${t}車收到，執行CMS「隔離轉向架」作業，通話完畢。` },
     ]});
-    // 步驟2：司機員自按應急按鈕「煞車解除」（要求實際按壓，不另拆 OCC 台詞）→ 回報可移動
-    chunks.push({ title: '【故排】煞車 步驟2 按煞車解除→可移動', faultKey: 'fault_brake', requireAction: '煞車解除', lines: [
+    chunks.push({ title: '【故排】煞車 可移動', faultKey: 'recovered', requireAction: null, lines: [
       { who: '司機員', text: `${t}車回報，已完成隔離${bogies}轉向架並按壓煞車解除，列車可移動，OVER` },
     ]});
     if (downlink) {
