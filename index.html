@@ -236,7 +236,7 @@
       <div><label>練習情境</label><select id="scenario">
         <option value="normal">正常運轉</option><option value="random_fault">隨機故障排除 (故排)</option><option value="clear">異常處理 (清車)</option><option value="delay_intersection">未能通過路口 (紅燈)</option>
         <optgroup label="故障排除 (故排)">
-          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_power">供電系統故障</option><option value="fault_door">車門系統故障</option><option value="fault_speed">輔助速限裝置故障</option><option value="fault_ac">空調系統故障</option><option value="fault_restart">清車重開機</option>
+          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_power">供電-CMS 380V跳脫(集電弓)</option><option value="fault_door">車門-一組以上車門故障</option><option value="fault_speed">ATP-超速導致EB作動</option><option value="fault_ac">空調-一組以上未啟動</option><option value="fault_restart">清車重開機</option>
         </optgroup>
         <optgroup label="營運情境">
           <option value="scenario_point">轉轍器手動扳轉</option><option value="scenario_pei">PEI 旅客對講機</option>
@@ -322,24 +322,22 @@ const FAULT_DATA = {
     { type: "emergency", action: "煞車解除", report: "已完成CMS「隔離轉向架」作業，確認黃燈亮起，列車仍無法移動" },
     { type: "final", report: "已完成「隔離轉向架」並按壓應急按鈕「煞車解除」，確認列車可移動。請問OCC是否行駛至端點站清車換車" }
   ]},
-  fault_power: { name: "供電系統故障", steps: [
-    { type: "cms", action: "TCU錯誤復位", report: "列車發生供電系統故障，CMS顯示集電弓圖示異常，目前無法移動" },
-    { type: "emergency", action: "集電弓降弓 HV OFF", report: "TCU復位無效，手動升降弓一次確認無效，請求授權切換ESS模式" },
-    { type: "final", report: "已按壓應急按鈕「集電弓降弓 HV OFF」並完成切換ESS模式，確認列車可移動。請問OCC是否執行清車作業並收車回機廠" }
+  // ⚠ 以下 4 項為依《列車應變處理步驟》改寫之第一版草稿，待使用者逐項校對
+  fault_power: { name: "供電-CMS 380V跳脫(集電弓)", ending: "restart", recoverReport: "投入ESS模式仍無法移動，已按降級模式移動至下游車站並執行降弓重開機，列車恢復正常", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "CMS頁面顯示380V跳脫，牽引動力異常，列車無法移動，已確認集電弓圖示" },
+    { type: "emergency", action: "集電弓降弓 HV OFF", report: "TCU復位及手動升降弓一次均無效，請求授權切換ESS模式行駛" }
   ]},
-  fault_door: { name: "車門系統故障", steps: [
-    { type: "cms", action: "車門全開全關", report: "列車發生車門系統故障，車門無法關閉" },
-    { type: "emergency", action: "上下車門", report: "CMS車門全開全關作業無效，至現場確認車門仍無法手動關閉" },
-    { type: "final", report: "已按壓應急按鈕「上下車門」並完成故障車門隔離。請問OCC是否准許發車，行駛至下站後再行清車" }
+  fault_door: { name: "車門-一組以上車門故障", ending: "restart", recoverReport: "已隔離故障車門並執行降弓重開機，列車恢復正常", steps: [
+    { type: "cms", action: "車門全開全關", report: "CMS首頁車門圖示異常，一組以上車門無法關閉，列車無法移動" },
+    { type: "emergency", action: "上下車門", report: "CMS車門全開全關無效，已至現場確認車門無法手動關閉並隔離" }
   ]},
-  fault_speed: { name: "輔助速限裝置故障", steps: [
-    { type: "emergency", action: "ATP重置", report: "列車發生輔助速限裝置故障，ATP顯示E3516，目前無法移動" },
-    { type: "emergency", action: "列車自動保護 Bypass", report: "ATP重置無效，已執行Key Off/Key On，列車仍無法移動" },
-    { type: "final", report: "已完成按壓應急按鈕「列車自動保護 Bypass」，高架段已切換機廠模式，確認列車可移動。請問OCC是否收車回機廠" }
+  fault_speed: { name: "ATP-超速導致EB作動", ending: "restart", recoverReport: "已按列車自動保護Bypass、高架段切機廠模式仍無效，執行降弓重開機後恢復正常", steps: [
+    { type: "emergency", action: "ATP重置", report: "ATP及CMS人機介面顯示超速造成EB1/2作動，已將主控制器移至停機檔位並放開DSD，列車無法移動" },
+    { type: "emergency", action: "列車自動保護 Bypass", report: "ATP重置及Key Off/On均無效，列車仍無法移動" }
   ]},
-  fault_ac: { name: "空調系統故障", steps: [
-    { type: "cms", action: "空調重置", report: "列車發生空調系統故障，客室溫度偏高，CMS空調頁面顯示異常" },
-    { type: "final", report: "已完成CMS「空調重置」作業，確認空調系統已恢復正常。請問OCC是否持續觀察行駛至端點站" }
+  fault_ac: { name: "空調-一組以上未啟動", ending: "observe", recoverReport: "已執行CMS空調關閉10秒再開啟，空調恢復正常", steps: [
+    { type: "cms", action: "空調重置", report: "CMS空調頁面顯示一組以上空調未啟動，已確認溫度設定與自動模式正常" },
+    { type: "cms", action: "TCU錯誤復位", report: "空調重置後仍未恢復" }
   ]},
   fault_restart: { name: "清車重開機", steps: [
     { type: "emergency", action: "降級模式", report: "列車多項系統異常，請求執行清車重開機作業" },
@@ -649,7 +647,9 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
         // 煞車一律站間發生 → 用站間 loc（不用月台）
         pts.push({ loc: getAdjacentFaultLocation(leg.f, leg.t), _isBrakeScenario: true, _brakeType: type, _bogies: bogies, _isBlue: isBlue, _uplink: uplink, faultKey: 'fault_brake' });
       } else {
-        pts.push({ loc: faultLoc, _isFaultScenario: true, _atStation: atStation, faultKey: fKey, faultName: FAULT_DATA[fKey].name, steps: FAULT_DATA[fKey].steps });
+        const fd = FAULT_DATA[fKey];
+        const uplink = leg.t.includes('V11') || leg.t.includes('V26');
+        pts.push({ loc: faultLoc, _isFaultScenario: true, _atStation: atStation, faultKey: fKey, faultName: fd.name, steps: fd.steps, ending: fd.ending, recoverReport: fd.recoverReport, _isBlue: isBlue, _uplink: uplink });
       }
       faultDone = true; // 故障已注入 → 中斷行程
     } else if (scenario === "scenario_point") {
@@ -895,8 +895,9 @@ function makeChunks(trainId, pts) {
       cur.steps.forEach((s, idx) => {
         const call = `${cur.loc}，${trainId}車呼叫OCC，${s.report}，OVER`;
         if (s.type === "final") {
+          // 舊式結尾（沿用於尚未改寫的既有情境）
           const reply = `OCC收到，${trainId}車回報，${s.report.replace(/。請問.*$/,"")}，准許${trainId}車發車回報之要求，通話完畢。`;
-          chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }], requireAction: null, faultKey: cur.faultKey });
+          chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }], requireAction: null, faultKey: cur.faultKey, isFinal: true });
         } else {
           const act = s.type === 'cms' ? `執行CMS「${s.action}」作業` : `按壓應急按鈕「${s.action}」`;
           const reply = `OCC收到，${trainId}車，請${act}，確認列車是否恢復，OVER`;
@@ -904,6 +905,19 @@ function makeChunks(trainId, pts) {
           chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }], requireAction: s.action, faultKey: cur.faultKey });
         }
       });
+      // 新式正規結尾（由 FAULT_DATA 的 ending 決定；⚠ 第一版草稿，待逐項校對）
+      if (cur.ending === 'observe') {
+        chunks.push({ title: `【故排】${cur.faultName} - 恢復`, faultKey: 'recovered', isFinal: true, lines: [
+          { who: '司機員', text: `${trainId}車回報，${cur.recoverReport || '故障已排除，列車恢復正常'}，OVER` },
+          { who: 'OCC', text: `OCC收到，請${trainId}車繼續行駛，持續留意觀察，通話完畢。` },
+        ]});
+      } else if (cur.ending === 'restart') {
+        chunks.push({ title: `【故排】${cur.faultName} - 降弓重開機`, faultKey: 'recovered', requireAction: null, lines: [
+          { who: '司機員', text: `${trainId}車回報，${cur.recoverReport || '上述步驟無效，已執行降弓重開機，列車恢復正常'}，OVER` },
+          { who: 'OCC', text: `OCC收到，${trainId}車重開機後不載客，續行收車，OVER` },
+        ]});
+        buildPickupChunks(trainId, cur._isBlue).forEach(c => chunks.push(c));
+      }
     } else if (cur._isDelayScenario) {
       const call = `${cur.loc}，${trainId}車呼叫OCC，${cur.report}，OVER`;
       const reply = `OCC收到，${cur.loc}${trainId}車回報，${cur.report}，請待下一輪號誌開通，確認路口淨空後通過，OVER`;
