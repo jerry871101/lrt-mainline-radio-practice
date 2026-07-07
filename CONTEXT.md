@@ -129,7 +129,11 @@
 - ✅ **STAGE 3**：§3.4 `buildV380Chunks` 結局B 改呼叫 `buildPickupChunks`（走完整流程）。
 - ✅ **STAGE 2 完成**：拆 3 下拉（`fault_brake_err/se/2plus`）＋buildPoints 注入（子類型/轉向架/線別/方向＋設 persistentFault）＋新 `buildBrakeChunks`＋`updateCMSDisplay` 支援單一/全部/兩組＋makeChunks dispatch＋persistentFault 加 bogies/subtype 欄位。
 - ✅ **jsdom 白箱實測全綠**：台詞矩陣(4子型×綠藍上下行)零錯、注入→對話→CMS標籤 24/0、§1.5/§3.4 回歸 14/0、0 console 錯誤。
-- ⚠ **唯一未自動化**：實際 UI 點擊流程（「繼續」按鈕、單一ERR/SE 的 CMS 隔離點擊解鎖）＋視覺截圖。隔離互動沿用既有已測程式碼、風險低。**建議使用者線上點一次三種煞車情境確認**（或下次用 chromium 補跑）。
+- 🐛 **使用者線上實測抓到 2 bug（2026-07-07，已修＋驗證）**：
+  - **Bug 1 CMS/台詞轉向架不符 + Bug 收車後冒出「起始/V01」**：同根因＝`buildPoints` 對**多段行程**（如 V11→V26 拆兩段）**每段都注入故障**（覆蓋 persistentFault）＋故障收車後**照接正常終點**。修法：加 `faultDone` 旗標→故障只注入一次、`break` 不處理後續 leg、`if(!faultDone)` 不接 finalPt。（此修正也讓 §1.5/§3.4 更乾淨）
+  - **Bug 2 隔離後「煞車解除」鈕沒跳出**：單一 ERR/SE 步驟2 加 `requireAction:'煞車解除'`（emergency 面板會跳鈕，不多一段 OCC 台詞）。
+- ✅ **全面邏輯掃描通過**：10 情境 × 5 路線 × 6 次＝300 run，零 badReq(卡死)/空台詞/undefined/雙故障/CMS不符/殘留終點，0 console 錯誤。單一ERR/SE 確認有「隔離轉向架→煞車解除」兩鈕。
+- ⚠ 仍未自動化：真實滑鼠點 CMS 隔離＋按鈕的端到端 UI（jsdom 測到函式與 requireAction 合法性，但沒模擬點擊）＋視覺截圖。**建議使用者再線上點一次確認手感**。
 
 **🛠️ 實作計畫（台詞已全定稿，照此寫程式）：**
 1. **下拉**：line 237-239 把 `fault_brake` 拆成 3 個 option：`fault_brake_err`（單一ERR,隔離）／`fault_brake_se`（隨機單一SE=隔離／全部SE=重置→降弓重開機）／`fault_brake_2plus`（兩組ERR,降弓重開機）。randomPool（line 604）也對應調整。

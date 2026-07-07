@@ -591,6 +591,7 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
   else legs = [{f:fD, t:tD}];
 
   let runningTime = depTime;
+  let faultDone = false; // 故障一旦介入即中斷行程（只注入一次、不接正常終點）
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i]; const r = ROUTES_MAP[`${leg.f}-${leg.t}`] || "無路徑";
     let curPt = null;
@@ -641,6 +642,7 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
       } else {
         pts.push({ loc: faultLoc, _isFaultScenario: true, _atStation: atStation, faultKey: fKey, faultName: FAULT_DATA[fKey].name, steps: FAULT_DATA[fKey].steps });
       }
+      faultDone = true; // 故障已注入 → 中斷行程
     } else if (scenario === "scenario_point") {
       pts.push({ loc: "V09 1月台", _isPointScenario: true, pointId: "EPM100", side: "左位" });
     } else if (scenario === "scenario_pei") {
@@ -650,9 +652,10 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
       const jUp = (leg.t.includes("V11")||leg.t.includes("V26"));
       pts.push({ loc: j + (jUp ? '上行' : '下行'), _isDelayScenario: true, isUplink: jUp, report: `稍早於${leg.f}等候旅客上下車，未能通過${j}，待下一輪號誌開通後再通過路口` });
     }
+    if (faultDone) break; // 故障已介入 → 不再處理後續 leg
   }
   const finalPt = (tA === "depot") ? { loc: tD, report: `已停妥${tD}${tD.includes("2-0")?"，完成交接":"，Tetra轉G01完成"}`, isFinal: true } : { loc: tD, report: `已完成換端，接收建議路徑${ROUTES_MAP[tD+'-'+fD] || '[路徑號]'}，確認前方號誌開通，依時刻表發車`, isFinal: true };
-  pts.push(finalPt);
+  if (!faultDone) pts.push(finalPt); // 故障介入時不接正常終點（行程已由收車流程結束）
 
   return pts;
 }
@@ -800,7 +803,8 @@ function buildBrakeChunks(trainId, cur) {
       { who: 'OCC', text: `OCC收到，${t}車，請執行CMS「隔離轉向架」作業，確認列車是否恢復，OVER` },
       { who: '司機員', text: `${t}車收到，執行CMS「隔離轉向架」作業，通話完畢。` },
     ]});
-    chunks.push({ title: '【故排】煞車 步驟2 可移動', faultKey: 'recovered', requireAction: null, lines: [
+    // 步驟2：司機員自按應急按鈕「煞車解除」（要求實際按壓，不另拆 OCC 台詞）→ 回報可移動
+    chunks.push({ title: '【故排】煞車 步驟2 按煞車解除→可移動', faultKey: 'fault_brake', requireAction: '煞車解除', lines: [
       { who: '司機員', text: `${t}車回報，已完成隔離${bogies}轉向架並按壓煞車解除，列車可移動，OVER` },
     ]});
     if (downlink) {
