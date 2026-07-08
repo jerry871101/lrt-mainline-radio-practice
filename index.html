@@ -143,6 +143,7 @@
             <div id="atp-limit" class="atp-limit">20</div>
             <div style="font-size: 11px;">ATP V-MAX</div>
           </div>
+          <div id="btn-atp-reset" class="nav-btn" style="width:72px; padding:4px; font-size:10px; margin-top:4px;" onclick="handleCMSClick('ATP重置')">ATP重置</div>
         </div>
         <div class="cms-train-col" style="border: 1px solid #334155; padding: 6px; background: #111827; display: flex; flex-direction: column; align-items: center; justify-content: center;">
           <!-- 重新設計的 5 節車廂圖示 -->
@@ -236,7 +237,7 @@
       <div><label>練習情境</label><select id="scenario">
         <option value="normal">正常運轉</option><option value="random_fault">隨機故障排除 (故排)</option><option value="clear">異常處理 (清車)</option><option value="delay_intersection">未能通過路口 (紅燈)</option>
         <optgroup label="故障排除 (故排)">
-          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_power">供電-CMS 380V跳脫(集電弓)</option><option value="fault_door">車門-一組以上車門故障</option><option value="fault_speed">ATP-超速導致EB作動</option><option value="fault_ac">空調-一組以上未啟動</option><option value="fault_restart">清車重開機</option>
+          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_power">供電-CMS 380V跳脫(集電弓)</option><option value="fault_door">車門-一組以上車門故障</option><option value="fault_speed">ATP-超速導致EB作動</option><option value="fault_ac">空調-一組以上未啟動</option><option value="fault_traction_bypass">牽引-T字亮未紅燈(Bypass)</option><option value="fault_eb12">列車操作-EB1/2作動</option><option value="fault_eb3">列車操作-EB3作動</option><option value="fault_ac_2plus">空調-二組以上未啟動</option><option value="fault_atp_readerr">ATP-讀取錯誤導致EB作動</option><option value="fault_atp_asae">ATP-AS/AE煞車圖示</option><option value="fault_atp_flat">ATP-平面段故障</option><option value="fault_e1">煞車-首頁E1圖示(無Err/Se)</option><option value="fault_ee">煞車-首頁EE圖示</option><option value="fault_door_noauth">車門-無法授權</option><option value="fault_panto_up">供電-集電弓無法上升</option><option value="fault_panto_down">供電-集電弓無法下降</option><option value="fault_panto_stuck">供電-架空線斷電仍升弓</option><option value="fault_24v_1">供電-24V離線(一組)</option><option value="fault_24v_2">供電-24V離線(兩組)</option><option value="fault_24v_immobile">供電-24V離線(不可移動)</option><option value="fault_restart">清車重開機</option>
         </optgroup>
         <optgroup label="營運情境">
           <option value="scenario_point">轉轍器手動扳轉</option><option value="scenario_pei">PEI 旅客對講機</option>
@@ -332,12 +333,70 @@ const FAULT_DATA = {
     { type: "emergency", action: "上下車門", report: "CMS車門全開全關無效，已至現場確認車門無法手動關閉並隔離" }
   ]},
   fault_speed: { name: "ATP-超速導致EB作動", ending: "restart", recoverReport: "已按列車自動保護Bypass、高架段切機廠模式仍無效，執行降弓重開機後恢復正常", steps: [
-    { type: "emergency", action: "ATP重置", report: "ATP及CMS人機介面顯示超速造成EB1/2作動，已將主控制器移至停機檔位並放開DSD，列車無法移動" },
+    { type: "cms", action: "ATP重置", report: "ATP及CMS人機介面顯示超速造成EB1/2作動，已將主控制器移至停機檔位並放開DSD，列車無法移動" },
     { type: "emergency", action: "列車自動保護 Bypass", report: "ATP重置及Key Off/On均無效，列車仍無法移動" }
   ]},
   fault_ac: { name: "空調-一組以上未啟動", ending: "observe", recoverReport: "已執行CMS空調關閉10秒再開啟，空調恢復正常", steps: [
     { type: "cms", action: "空調重置", report: "CMS空調頁面顯示一組以上空調未啟動，已確認溫度設定與自動模式正常" },
     { type: "cms", action: "TCU錯誤復位", report: "空調重置後仍未恢復" }
+  ]},
+  // 批次 2（2026-07-07）A類草稿，待使用者逐項校對
+  fault_traction_bypass: { name: "牽引-T字亮未紅燈(Bypass)", ending: "restart", recoverReport: "按列車自動保護Bypass、高架段切機廠模式仍無效，已復歸應急按鈕後執行降弓重開機，列車恢復正常", steps: [
+    { type: "emergency", action: "列車自動保護 Bypass", report: "CMS首頁T字燈號有亮起、總故障燈未亮紅燈，主控制器無法出力，列車無牽引動力、無法移動" }
+  ]},
+  fault_eb12: { name: "列車操作-EB1/2作動", ending: "restart", recoverReport: "按降級模式＋機廠模式（需行控授權）重複操作仍無效，已執行降弓重開機，列車恢復正常", steps: [
+    { type: "emergency", action: "降級模式", report: "列車倒滑導致EB1/2作動，已將主控制器移至停機檔位、放開DSD再回煞車檔位並重複四至五次，仍無牽引動力，列車無法移動" }
+  ]},
+  fault_eb3: { name: "列車操作-EB3作動", ending: "restart", recoverReport: "按降級模式＋機廠模式（需行控授權）仍無效，已執行降弓重開機，列車恢復正常", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "主控制器誤移至緊急煞車EB3檔位造成EB3作動，已確認集電弓、供電、電壓、空調狀態，並將主控制器移回煞車檔位，仍無牽引動力，列車無法移動" },
+    { type: "emergency", action: "降級模式", report: "TCU復位後仍無牽引動力" }
+  ]},
+  // 批次 3（2026-07-07）A/B類草稿，待使用者逐項校對（CMS 尚未加對應視覺；收車一律通用收車）
+  fault_ac_2plus: { name: "空調-二組以上未啟動", ending: "restart", recoverReport: "已確認兩端「空調關閉」應急按鈕復歸仍無效，執行降弓重開機空調仍未恢復，續行收車", steps: [
+    { type: "cms", action: "空調重置", report: "CMS空調頁面顯示二組以上空調未啟動，已確認溫度設定與自動模式正常" },
+    { type: "cms", action: "TCU錯誤復位", report: "空調重置後仍未恢復" }
+  ]},
+  fault_atp_readerr: { name: "ATP-讀取錯誤導致EB作動", ending: "restart", recoverReport: "按列車自動保護Bypass、高架段切機廠模式仍無效，已執行降弓重開機，列車恢復正常", steps: [
+    { type: "cms", action: "ATP重置", report: "ATP及CMS人機介面因讀取錯誤導致EB1/2作動，已將主控制器拉至停機檔位放開DSD、ATP重置鍵紅燈亮起，列車無法移動" },
+    { type: "emergency", action: "列車自動保護 Bypass", report: "ATP重置及Key Off/On均無效，列車仍無法移動" }
+  ]},
+  fault_atp_asae: { name: "ATP-AS/AE煞車圖示", ending: "restart", recoverReport: "按列車自動保護Bypass、高架段切機廠模式仍無效，已執行降弓重開機，列車恢復正常", steps: [
+    { type: "cms", action: "ATP重置", report: "CMS出現AS/AE煞車圖示，已確認ATP電子面板故障代碼，將主控制器拉至停機檔位放開DSD、ATP重置鍵紅燈亮起，列車無法移動" },
+    { type: "emergency", action: "列車自動保護 Bypass", report: "ATP重置及Key Off/On均無效，列車仍無法移動" }
+  ]},
+  fault_atp_flat: { name: "ATP-平面段故障", ending: "observe", recoverReport: "已按應急按鈕「列車自動保護」（平面段不需切換機廠模式），列車恢復可行駛，將於端點站（上行V11/V26、下行V08二月台）復歸應急按鈕", steps: [
+    { type: "emergency", action: "列車自動保護 Bypass", report: "ATP於平面段故障，列車無法移動" }
+  ]},
+  fault_e1: { name: "煞車-首頁E1圖示(無Err/Se)", ending: "restart", recoverReport: "查看TCMS內BCU無紅燈，按降級模式＋機廠模式仍無效，已執行降弓重開機，列車恢復正常", steps: [
+    { type: "emergency", action: "降級模式", report: "CMS首頁出現E1煞車圖示、未伴隨Err或Se，已將主控制器回停機檔放開DSD、推中立再回停機並重複四至五次，仍無牽引動力，列車無法移動" }
+  ]},
+  fault_ee: { name: "煞車-首頁EE圖示", ending: "restart", recoverReport: "按降級模式＋機廠模式仍無效，已執行降弓重開機，列車恢復正常", steps: [
+    { type: "emergency", action: "降級模式", report: "CMS首頁出現EE煞車圖示、總故障燈亮紅燈列車無法啟動，已將主控制器壓著DSD推到底3至5秒再拉回停機檔並重複四至五次，仍無牽引動力，列車無法移動" }
+  ]},
+  fault_door_noauth: { name: "車門-無法授權", ending: "observe", recoverReport: "按壓零速度後釋放開門訊號仍無效，經OCC授權操作「第一道車門」供旅客上下車", steps: [
+    { type: "cms", action: "車門全開全關", report: "CMS首頁車門圖示不正常、車門無法授權，列車停於月台、月台側開門，經行控授權執行全部開門開關一次" },
+    { type: "emergency", action: "零速度", report: "全開全關無效，已收回車門授權" }
+  ]},
+  fault_panto_up: { name: "供電-集電弓無法上升", ending: "restart", recoverReport: "按緊急降弓、手動選擇無架空線區間仍無法投入ESS，已執行降弓重開機後投入ESS模式，依指示收車", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "架空線區間燈號異常、CMS首頁集電弓圖示異常，集電弓無法上升，已確認行車模式非關閉並重新操作集電方式選擇旋鈕選擇架空線區間仍無法升弓，列車無法移動" },
+    { type: "emergency", action: "集電弓降弓 HV OFF", report: "TCU復位無效無法投入ESS模式，已切關閉模式按CMS降弓、確認HSCB斷開仍無法投入ESS" }
+  ]},
+  fault_panto_down: { name: "供電-集電弓無法下降", ending: "restart", recoverReport: "按緊急降弓、手動選擇無架空線區間仍無法投入ESS，已於升弓狀態重新開機後投入ESS模式，依指示收車", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "CMS首頁集電弓圖示異常，集電弓無法下降，已重新操作集電方式選擇旋鈕選擇無架空線區間並確認投入ESS模式" },
+    { type: "emergency", action: "集電弓降弓 HV OFF", report: "TCU復位後集電弓仍無法下降、無牽引動力，已切關閉模式按CMS降弓、確認HSCB斷開" }
+  ]},
+  fault_panto_stuck: { name: "供電-架空線斷電仍升弓", ending: "observe", recoverReport: "已操作集電方式選擇旋鈕選擇無架空線ESS模式，成功投入ESS模式，列車恢復行駛", steps: [
+    { type: "emergency", action: "集電弓降弓 HV OFF", report: "架空線斷電時集電弓維持升弓狀態，列車已停妥並切關閉模式按CMS降弓仍無法降弓，授權按壓緊急降弓" },
+    { type: "cms", action: "TCU錯誤復位", report: "已完成降弓，切換主線模式" }
+  ]},
+  fault_24v_1: { name: "供電-24V蓄電池離線(一組)", ending: "observe", recoverReport: "已按TCU錯誤復位，一組24V蓄電池離線、列車可移動，將持續觀察行駛至端點站清車收車", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "CMS發現一組24V蓄電池離線，列車仍可移動" }
+  ]},
+  fault_24v_2: { name: "供電-24V蓄電池離線(兩組)", ending: "restart", recoverReport: "兩組24V離線仍無法恢復，已關閉客室空調照明並執行降弓重開機，依指示清車收車", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "CMS發現兩組24V蓄電池離線，已關閉客室空調及照明並嘗試TCU復位，列車無法移動" }
+  ]},
+  fault_24v_immobile: { name: "供電-24V蓄電池離線(不可移動)", ending: "restart", recoverReport: "TCU復位無效，已執行降弓重開機，24V蓄電池及牽引恢復，依指示清車收車", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "CMS發現24V蓄電池離線且列車不可移動，已關閉車廂照明與空調並按壓TCU錯誤復位" }
   ]},
   fault_restart: { name: "清車重開機", steps: [
     { type: "emergency", action: "降級模式", report: "列車多項系統異常，請求執行清車重開機作業" },
@@ -361,7 +420,7 @@ function resetFaultState(isRestart) {
   doorSeqStep = 0;
   brakeReleaseStep = 0;
   // CMS 操作按鈕底色歸位（避免跨情境殘留綠色）
-  [['btn-door-open','#334155'],['btn-door-close','#334155'],['btn-tcu-reset','#334155'],['btn-ac-reset','#334155'],['btn-bogie-isolate','#334155'],['btn-mirror-reset','']].forEach(([id,bg]) => { const b = document.getElementById(id); if (b) b.style.background = bg; });
+  [['btn-door-open','#334155'],['btn-door-close','#334155'],['btn-tcu-reset','#334155'],['btn-ac-reset','#334155'],['btn-bogie-isolate','#334155'],['btn-mirror-reset',''],['btn-atp-reset','']].forEach(([id,bg]) => { const b = document.getElementById(id); if (b) b.style.background = bg; });
   // 只有執行清車重開機才復歸應急按鈕
   if (isRestart) activeEmergencyButtons.clear();
 }
@@ -421,6 +480,12 @@ function switchCMSTab(tab) {
 const MASTER_FAULT_LAMP = {
   fault_brake: 'red',              // E1/EB 緊急煞車作動 → 紅
   fault_traction_redlight: 'red',  // §1.5 無牽引動力，總故障燈亮紅燈 → 紅（待 §1.5 加入後生效）
+  fault_e1: 'red',                 // 首頁E1煞車圖示 → 紅
+  fault_ee: 'red',                 // 首頁EE煞車圖示、總故障燈亮紅燈 → 紅
+  fault_eb12: 'red',               // EB1/2作動 → 紅（文件：EB作動＝紅）
+  fault_eb3: 'red',                // EB3作動 → 紅
+  fault_atp_readerr: 'red',        // ATP讀取錯誤導致EB1/2作動 → 紅
+  // 注意：fault_traction_bypass 為「總故障燈未亮紅燈」→ 維持白（不入表）
 };
 function setMasterFaultLamp(scenario) {
   const palette = { white: ['#e5e7eb', '#94a3b8'], yellow: ['#fbbf24', '#b45309'], red: ['#ef4444', '#b91c1c'] };
@@ -445,6 +510,11 @@ function updateCMSDisplay(scenario) {
   // 重置列車圖示狀態
   ["t-m1-1","t-m1-2","t-m5-1","t-m5-2"].forEach(id => document.getElementById(id).className = "cms-icon active-t");
   ["m1","m3","m5"].forEach(b => document.getElementById(`bogie-status-${b}`).innerText = "");
+
+  // 小工具（批次1~3視覺共用）
+  const alert2 = (msg) => { diag.innerText = msg; navDiag.classList.add('alert'); };
+  const gearFault = (txt) => { gear.innerText = txt; gear.className = "cms-gear-display fault"; };
+  const atpFault = (code) => { document.getElementById("atp-hmi").className = "atp-hmi fault"; document.getElementById("atp-limit").innerText = code; };
 
   if (scenario === "fault_traction_tcu") {
     gear.innerText = "E1"; gear.className = "cms-gear-display fault";
@@ -489,6 +559,20 @@ function updateCMSDisplay(scenario) {
   else if (scenario === "fault_power") { document.getElementById("cms-p").className = "cms-icon fault"; }
   else if (scenario === "fault_door") { document.getElementById("d-m2l").className = "door-box offline"; document.getElementById("d-m4l").className = "door-box offline"; }
   else if (scenario === "fault_speed") { document.getElementById("atp-hmi").className = "atp-hmi fault"; document.getElementById("atp-limit").innerText = "E3516"; }
+  // ── 批次2/3 高＋中優先視覺（2026-07-07；⚠ 故障碼/顯示待校對）──
+  else if (scenario === "fault_atp_readerr") { atpFault("FAULT"); alert2("讀取錯誤導致EB1/2作動"); }
+  else if (scenario === "fault_atp_asae") { atpFault("E3904"); gearFault("AS"); alert2("CMS出現AS/AE煞車圖示"); }
+  else if (scenario === "fault_atp_flat") { atpFault("FLT"); alert2("ATP於平面段故障"); }
+  else if (scenario === "fault_e1") { gearFault("E1"); document.getElementById("cms-t").className = "cms-icon fault"; alert2("首頁出現E1煞車圖示（未伴隨Err/Se）"); }
+  else if (scenario === "fault_ee") { gearFault("EE"); alert2("首頁出現EE煞車圖示，總故障燈紅燈、列車無法啟動"); }
+  else if (scenario === "fault_eb12") { alert2("EB1/2作動（倒滑）"); }
+  else if (scenario === "fault_eb3") { alert2("EB3作動（主控制器移至緊急煞車EB3檔位）"); }
+  else if (scenario === "fault_traction_bypass") { gearFault("E1"); document.getElementById("cms-t").className = "cms-icon active-t"; alert2("T字燈亮、總故障燈未亮紅燈、主控制器無法出力"); }
+  else if (scenario === "fault_panto_up") { document.getElementById("cms-p").className = "cms-icon fault"; alert2("集電弓無法上升，CMS集電弓圖示異常"); }
+  else if (scenario === "fault_panto_down") { document.getElementById("cms-p").className = "cms-icon fault"; alert2("集電弓無法下降"); }
+  else if (scenario === "fault_panto_stuck") { document.getElementById("cms-p").className = "cms-icon fault"; alert2("架空線斷電，集電弓維持升弓狀態"); }
+  else if (scenario === "fault_24v_1" || scenario === "fault_24v_2" || scenario === "fault_24v_immobile") { document.getElementById("cms-380v").className = "cms-icon v380-fault"; alert2("CMS發現24V蓄電池離線"); }
+  else if (scenario === "fault_door_noauth") { document.getElementById("d-m2l").className = "door-box offline"; document.getElementById("d-m4l").className = "door-box offline"; alert2("車門無法授權，車門圖示不正常"); }
   else if (scenario === "tetra_special") { 
     navDiag.classList.add('alert'); 
     diag.innerText = "ESS1放電電流過大/ESS1電池芯電壓差過大/ESS1電池偵測版異常，電池未跳脫"; 
@@ -542,6 +626,10 @@ function handleCMSClick(action) {
       return;
     }
     if (action === '後視鏡重置') document.getElementById('btn-mirror-reset').style.background = "#10b981";
+    if (action === 'ATP重置') {
+      document.getElementById('btn-atp-reset').style.background = "#10b981";
+      setTimeout(() => { document.getElementById("atp-hmi").className = "atp-hmi"; document.getElementById("atp-limit").innerText = "20"; }, 300);
+    }
     completedActions.add(revealed); setTimeout(() => { pendingAction = null; render(); }, 500);
   } else if (action === '隔離轉向架') {
     document.querySelector('.bogie-unit.selected').classList.toggle('isolated');
@@ -569,7 +657,7 @@ function updateEmergencyPanel(action) {
   const panel = document.getElementById('emergency-panel');
   if (!action) { panel.style.display = "none"; return; }
   panel.style.display = "block";
-  const buttons = ["列車自動保護 Bypass", "煞車解除", "集電弓降弓 HV OFF", "上下車門", "降級模式", "ATP重置"];
+  const buttons = ["列車自動保護 Bypass", "煞車解除", "集電弓降弓 HV OFF", "上下車門", "降級模式", "零速度"];
   document.getElementById('em-btns').innerHTML = buttons.map(b => {
     const isTarget  = b === action;
     const isUsed    = activeEmergencyButtons.has(b) && !isTarget;
@@ -615,7 +703,7 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
 
     const roll = Math.random();
     if ((scenario === "random_fault" && roll > 0.3) || (scenario.startsWith("fault_"))) {
-      const randomPool = ['fault_traction_tcu','fault_brake','fault_power','fault_door','fault_speed','fault_ac','fault_restart'];
+      const randomPool = ['fault_traction_tcu','fault_brake','fault_power','fault_door','fault_speed','fault_ac','fault_traction_bypass','fault_eb12','fault_eb3','fault_ac_2plus','fault_atp_readerr','fault_atp_asae','fault_atp_flat','fault_e1','fault_ee','fault_door_noauth','fault_panto_up','fault_panto_down','fault_panto_stuck','fault_24v_1','fault_24v_2','fault_24v_immobile','fault_restart'];
       const fKey = scenario.startsWith("fault_") ? scenario : randomPool[Math.floor(Math.random()*randomPool.length)];
       // 隨機決定故障發生於「站內(月台)」或「站間途中」（Q2）
       const atStation = Math.random() < 0.5 && leg.t.includes("月台");
@@ -936,7 +1024,7 @@ function render() {
   const box = document.getElementById("result"); if (currentChunks.length === 0) return;
   const lastChunk = currentChunks[revealed - 1];
   if (lastChunk && lastChunk.faultKey) updateCMSDisplay(lastChunk.faultKey);
-  const cmsActions = ['TCU錯誤復位', '隔離轉向架', '車門全開全關', '空調重置', '後視鏡重置'];
+  const cmsActions = ['TCU錯誤復位', '隔離轉向架', '車門全開全關', '空調重置', '後視鏡重置', 'ATP重置'];
   pendingAction = (lastChunk && !completedActions.has(revealed)) ? lastChunk.requireAction : null;
   if (pendingAction !== '車門全開全關') doorSeqStep = 0; // 離開車門步驟時重置序列
   if (pendingAction !== '隔離並煞車解除') brakeReleaseStep = 0; // 離開複合步驟時重置
@@ -956,6 +1044,7 @@ function render() {
     } else if (cmsActions.includes(pendingAction)) {
       if (pendingAction === 'TCU錯誤復位') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-propulsion').classList.add('highlight'); document.getElementById('btn-tcu-reset').classList.add('highlight'); }
       if (pendingAction === '後視鏡重置') document.getElementById('btn-mirror-reset').classList.add('highlight');
+      if (pendingAction === 'ATP重置') document.getElementById('btn-atp-reset').classList.add('highlight');
       if (pendingAction === '空調重置') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-ac').classList.add('highlight'); document.getElementById('btn-ac-reset').classList.add('highlight'); }
       if (pendingAction === '隔離轉向架') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-brake').classList.add('highlight'); document.getElementById('btn-bogie-isolate').classList.add('highlight'); }
       if (pendingAction === '車門全開全關') { document.getElementById('nav-control').classList.add('alert'); document.getElementById('btn-sub-door').classList.add('highlight'); document.getElementById(doorSeqStep === 0 ? 'btn-door-open' : 'btn-door-close').classList.add('highlight'); }
