@@ -260,6 +260,13 @@ const STATION_SEQUENCE = ["V01","V02","V03","V04","V05","V06","V07","V08","V09",
 // 藍海線：V01–V09 共線後，於 V09 分歧 → V28 → V27 → V26（終點）
 const BLUE_SEQUENCE    = ["V01","V02","V03","V04","V05","V06","V07","V08","V09","V28","V27","V26"];
 
+// 高架段 V01–V07（J01 於 V07 側起轉平面）；故障位置在高架段才需「切換機廠模式」
+function isElevatedLoc(loc) {
+  if (/J\d/.test(loc)) return false; // 路口一律平面
+  const nums = (loc.match(/V(\d+)/g) || []).map(s => parseInt(s.slice(1), 10));
+  return nums.length > 0 && nums.every(n => n >= 1 && n <= 7);
+}
+
 function getAdjacentFaultLocation(from, to) {
   // 取得 from 和 to 的站名（去掉月台）
   const getStation = s => s.replace(/ [12]月台.*/, '').trim();
@@ -341,8 +348,10 @@ const FAULT_DATA = {
     { type: "cms", action: "TCU錯誤復位", report: "空調重置後仍未恢復" }
   ]},
   // 批次 2（2026-07-07）A類草稿，待使用者逐項校對
-  fault_traction_bypass: { name: "牽引-T字亮未紅燈(Bypass)", ending: "restart", recoverReport: "按列車自動保護Bypass、高架段切機廠模式仍無效，已復歸應急按鈕後執行降弓重開機，列車恢復正常", steps: [
-    { type: "emergency", action: "列車自動保護 Bypass", report: "CMS首頁T字燈號有亮起、總故障燈未亮紅燈，主控制器無法出力，列車無牽引動力、無法移動" }
+  // 牽引-T字亮未紅燈(Bypass)：2026-07-08 使用者逐句定稿。{MC}＝高架段(V01–V07)才帶入「並切換機廠模式」
+  fault_traction_bypass: { name: "牽引-T字亮未紅燈(Bypass)", ending: "restart", recoverReport: "已完成降弓重開機，列車恢復正常、可移動", steps: [
+    { type: "emergency", action: "列車自動保護 Bypass", mcMode: true, report: "CMS首頁T字燈號有亮起、總故障燈未亮紅燈，主控制器無法出力，列車無牽引動力、無法移動" },
+    { type: "report", report: "已按壓應急按鈕「列車自動保護 Bypass」{MC}仍無效，列車無法移動", occ: "請播放預錄廣播告知旅客相關資訊後，復歸應急按鈕並執行降弓重開機", echo: "播放預錄廣播後復歸應急按鈕並執行降弓重開機" }
   ]},
   fault_eb12: { name: "列車操作-EB1/2作動", ending: "restart", recoverReport: "按降級模式＋機廠模式（需行控授權）重複操作仍無效，已執行降弓重開機，列車恢復正常", steps: [
     { type: "emergency", action: "降級模式", report: "列車倒滑導致EB1/2作動，已將主控制器移至停機檔位、放開DSD再回煞車檔位並重複四至五次，仍無牽引動力，列車無法移動" }
@@ -737,7 +746,7 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
       } else {
         const fd = FAULT_DATA[fKey];
         const uplink = leg.t.includes('V11') || leg.t.includes('V26');
-        pts.push({ loc: faultLoc, _isFaultScenario: true, _atStation: atStation, faultKey: fKey, faultName: fd.name, steps: fd.steps, ending: fd.ending, recoverReport: fd.recoverReport, _isBlue: isBlue, _uplink: uplink });
+        pts.push({ loc: faultLoc, _isFaultScenario: true, _atStation: atStation, faultKey: fKey, faultName: fd.name, steps: fd.steps, ending: fd.ending, recoverReport: fd.recoverReport, _isBlue: isBlue, _uplink: uplink, _elevated: isElevatedLoc(faultLoc) });
       }
       faultDone = true; // 故障已注入 → 中斷行程
     } else if (scenario === "scenario_point") {
@@ -980,17 +989,20 @@ function makeChunks(trainId, pts) {
     } else if (cur._isBrakeScenario) {
       buildBrakeChunks(trainId, cur).forEach(c => chunks.push(c));
     } else if (cur._isFaultScenario) {
+      const mc = cur._elevated ? '並切換機廠模式' : ''; // {MC}：高架段才帶入
       cur.steps.forEach((s, idx) => {
-        const call = `${cur.loc}，${trainId}車呼叫OCC，${s.report}，OVER`;
+        const rep = (s.report || '').replace(/\{MC\}/g, mc);
+        // type:'report'＝後續回報（不帶位置前綴）；其餘為含位置的初報/呼叫
+        const call = s.type === 'report' ? `${trainId}車回報，${rep}，OVER` : `${cur.loc}，${trainId}車呼叫OCC，${rep}，OVER`;
         if (s.type === "final") {
           // 舊式結尾（沿用於尚未改寫的既有情境）
-          const reply = `OCC收到，${trainId}車回報，${s.report.replace(/。請問.*$/,"")}，准許${trainId}車發車回報之要求，通話完畢。`;
+          const reply = `OCC收到，${trainId}車回報，${rep.replace(/。請問.*$/,"")}，准許${trainId}車發車回報之要求，通話完畢。`;
           chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }], requireAction: null, faultKey: cur.faultKey, isFinal: true });
         } else {
-          const act = s.type === 'cms' ? `執行CMS「${s.action}」作業` : `按壓應急按鈕「${s.action}」`;
-          const reply = `OCC收到，${trainId}車，請${act}，確認列車是否恢復，OVER`;
-          const repeat = `${trainId}車收到，${act}，通話完畢。`;
-          chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }], requireAction: s.action, faultKey: cur.faultKey });
+          const act = s.type === 'cms' ? `執行CMS「${s.action}」作業` : s.action ? `按壓應急按鈕「${s.action}」${s.mcMode ? mc : ''}` : '';
+          const reply = s.occ ? `OCC收到，${trainId}車，${s.occ}，OVER` : `OCC收到，${trainId}車，請${act}，確認列車是否恢復，OVER`;
+          const repeat = s.echo ? `${trainId}車收到，${s.echo}，通話完畢。` : `${trainId}車收到，${act}，通話完畢。`;
+          chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }], requireAction: s.action || null, faultKey: cur.faultKey });
         }
       });
       // 新式正規結尾（由 FAULT_DATA 的 ending 決定；⚠ 第一版草稿，待逐項校對）
