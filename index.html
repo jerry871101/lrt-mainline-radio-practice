@@ -246,8 +246,7 @@
   </div>
   <div class="card">
     <h2>② 起訖車站</h2>
-    <div class="row"><select id="fromArea"></select><select id="fromDetail"></select></div>
-    <div class="row"><select id="toArea"></select><select id="toDetail"></select></div>
+    <div class="row"><select id="fromDetail"></select><select id="toDetail"></select></div>
     <select id="endAction"><option value="continue">換端後繼續發車</option><option value="finish">換端後返回車班</option></select>
   </div>
   <button id="genBtn">產生正線運轉程序</button>
@@ -320,11 +319,8 @@ const AREAS = {
 const ROUTES_MAP = { "V11 2月台-V01 2月台": "11901", "V11 1月台-V01 2月台": "11702", "V01 2月台-V26 1月台": "10601", "V26 1月台-V01 1月台": "10003", "V01 1月台-V11 2月台": "12101", "V01 1月台-V26 1月台": "10401", "V01 1月台-V26 2月台": "10501", "V26 2月台-V01 1月台": "10201", "V26 2月台-V01 2月台": "10301", "V11 1月台-V01 1月台": "11603", "V11 2月台-V01 1月台": "11801", "V01 2月台-V11 1月台": "12201", "V01 2月台-V11 2月台": "12306", "V01 2月台-V26 2月台": "10704", "V26 1月台-V09 2月台": "10101", "V09 2月台-V11 2月台": "12801", "V26 2月台-V09 2月台": "10301" };
 
 const FAULT_DATA = {
-  fault_traction_tcu: { name: "牽引-CMS T字燈號消失(TCU離線)", steps: [
-    { type: "cms", action: "TCU錯誤復位", report: "列車發生牽引系統故障，CMS顯示T字燈號消失，目前無法移動" },
-    { type: "emergency", action: "列車自動保護 Bypass", report: "TCU復位無效，確認ATP無異常，列車仍無法移動" },
-    { type: "final", report: "已完成按壓應急按鈕「列車自動保護 Bypass」，高架段已切換機廠模式，確認列車可移動。請問OCC是否各站無旅客上下車立即發車，直到時刻表回復準點為止" }
-  ]},
+  // fault_traction_tcu：2026-07-10 使用者定稿改走專屬 builder（buildTcuChunks），不再走 FAULT_DATA 通用 renderer。
+  // 刪 Bypass 步驟（權威文件無此步）；隨機熄 1～2 顆 T 燈報實際位置；收車＝煞車 ERR 同款「未就地重開機型」。
   fault_brake: { name: "煞車系統故障", steps: [
     { type: "cms", action: "隔離轉向架", report: "CMS顯示E1煞車故障，轉向架出現ERR標籤，目前無法移動" },
     { type: "emergency", action: "煞車解除", report: "已完成CMS「隔離轉向架」作業，確認黃燈亮起，列車仍無法移動" },
@@ -376,8 +372,11 @@ const FAULT_DATA = {
   fault_atp_flat: { name: "ATP-平面段故障", ending: "observe", recoverReport: "已按應急按鈕「列車自動保護」（平面段不需切換機廠模式），列車恢復可行駛，將於端點站（上行V11/V26、下行V08二月台）復歸應急按鈕", steps: [
     { type: "emergency", action: "列車自動保護 Bypass", report: "ATP於平面段故障，列車無法移動" }
   ]},
-  fault_e1: { name: "煞車-首頁E1圖示(無Err/Se)", ending: "restart", recoverReport: "查看TCMS內BCU無紅燈，按降級模式＋機廠模式仍無效，已執行降弓重開機，列車恢復正常", steps: [
-    { type: "emergency", action: "降級模式", report: "CMS首頁出現E1煞車圖示、未伴隨Err或Se，已將主控制器回停機檔放開DSD、推中立再回停機並重複四至五次，仍無牽引動力，列車無法移動" }
+  // 煞車-首頁E1(無Err/Se)：2026-07-10 校對定稿。BCU 分支不做（1組紅=同ERR隔離、2組紅=同兩組以上，教學重複）；只走「BCU無紅燈」主線
+  fault_e1: { name: "煞車-首頁E1圖示(無Err/Se)", ending: "restart", recoverReport: "已完成降弓重開機，列車恢復正常、可移動", steps: [
+    { type: "call", report: "CMS首頁出現E1煞車圖示、未伴隨Err或Se，已將主控制器回停機檔位放開DSD、推至中立位再回停機檔位重複四至五次，仍無牽引動力，列車無法移動", occ: "請查看TCMS內BCU是否亮紅燈", echo: "查看TCMS內BCU是否亮紅燈" },
+    { type: "report", report: "TCMS內BCU未亮紅燈", action: "降級模式", occ: "請按壓應急按鈕「降級模式」{MC}，嘗試移動列車", echo: "按壓應急按鈕「降級模式」{MC}" },
+    { type: "report", report: "已按壓應急按鈕「降級模式」{MC}仍無效，列車無法移動", occ: "請播放預錄廣播告知旅客相關資訊後，復歸應急按鈕並執行降弓重開機", echo: "播放預錄廣播後復歸應急按鈕並執行降弓重開機" }
   ]},
   fault_ee: { name: "煞車-首頁EE圖示", ending: "restart", recoverReport: "按降級模式＋機廠模式仍無效，已執行降弓重開機，列車恢復正常", steps: [
     { type: "emergency", action: "降級模式", report: "CMS首頁出現EE煞車圖示、總故障燈亮紅燈列車無法啟動，已將主控制器壓著DSD推到底3至5秒再拉回停機檔並重複四至五次，仍無牽引動力，列車無法移動" }
@@ -421,10 +420,10 @@ let activeEmergencyButtons = new Set(); // 已按壓過的應急按鈕，直到�
 let currentBogieIdx = 0; // 0:M1, 1:M3, 2:M5
 let isACOff = false;
 let isFlangeLubOn = false;
-let persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false, bogies: null, subtype: null };
+let persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false, bogies: null, subtype: null, tLights: null };
 
 function resetFaultState(isRestart) {
-  persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false, bogies: null, subtype: null };
+  persistentFault = { bogie: null, tag: null, tIndex: null, isolated: false, bogies: null, subtype: null, tLights: null };
   setMasterFaultLamp(null); // 總故障燈歸位白色（正常）
   doorSeqStep = 0;
   brakeReleaseStep = 0;
@@ -526,9 +525,10 @@ function updateCMSDisplay(scenario) {
   const atpFault = (code) => { document.getElementById("atp-hmi").className = "atp-hmi fault"; document.getElementById("atp-limit").innerText = code; };
 
   if (scenario === "fault_traction_tcu") {
-    gear.innerText = "E1"; gear.className = "cms-gear-display fault";
+    // T字燈號消失：熄滅注入時抽中的 1～2 顆 T 燈（M1/M5 各 2 顆）；TCMS 未紅燈 → 總故障燈維持白、檔位不變
+    (persistentFault.tLights || ["t-m1-1"]).forEach(id => document.getElementById(id).className = "cms-icon inactive");
     document.getElementById("cms-t").className = "cms-icon fault";
-    document.getElementById("t-m1-1").className = "cms-icon inactive";
+    alert2("CMS首頁T字燈號消失（TCU離線）");
   }
   else if (scenario === "fault_traction_redlight") {
     gear.innerText = "E1"; gear.className = "cms-gear-display fault";
@@ -605,7 +605,8 @@ function handleCMSClick(action) {
   if (pendingAction === action || (action === '隔離轉向架' && (pendingAction === '煞車解除' || pendingAction === '隔離並煞車解除'))) {
     if (action === 'TCU錯誤復位') {
       document.getElementById('btn-tcu-reset').style.background = "#10b981";
-      setTimeout(() => {
+      // TCU離線情境：復位後「牽引圖示仍離線」→ T 燈維持熄滅，直到端點站清車重開機才歸位
+      if (persistentFault.subtype !== 'tcu') setTimeout(() => {
         document.getElementById("cms-t").className = "cms-icon active-t";
         ["t-m1-1","t-m1-2","t-m5-1","t-m5-2"].forEach(id => document.getElementById(id).className = "cms-icon active-t");
         document.getElementById("diag-content").innerText = "無主動故障紀錄"; document.getElementById("nav-diag").classList.remove('alert');
@@ -700,8 +701,14 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
     const leg = legs[i]; const r = ROUTES_MAP[`${leg.f}-${leg.t}`] || "無路徑";
     let curPt = null;
     if (i === 0) {
-      if (leg.f.includes("1-0")) curPt = { loc: leg.f, report: "已完成車底車外巡視，做好動車前準備", _isBackupDeparture10: true };
-      else if (leg.f.includes("2-0")) curPt = { loc: leg.f, report: "已完成交接做好動車前準備", _isBackupDeparture20: true };
+      if (leg.f.includes("1-0") || leg.f.includes("2-0")) {
+        // 備用車自臨時駐車位置出發（2026-07-10 定稿）：1-0→V11第1月台、2-0→V11第2月台授權載客
+        // 僅目的地為正線月台時走載客發車對話；開回轉換軌等機廠點維持通用回覆
+        const p = leg.f.includes("1-0") ? "1" : "2";
+        const rpt = leg.f.includes("1-0") ? "已完成車底車外巡視，做好動車前準備" : "已完成交接做好動車前準備";
+        if (leg.t.includes("月台")) curPt = { loc: leg.f, report: rpt, _isBackupDeparture: true, _platform: p, _routeNo: ROUTES_MAP[`V11 ${p}月台-${leg.t}`] || "[路徑號]", _depTime: depTime };
+        else curPt = { loc: leg.f, report: rpt };
+      }
       else if (fA === "depot") curPt = { loc: leg.f, report: `已停妥${leg.f}，做好動車前準備`, _isDepotDeparture: true };
       else { let act = leg.f.includes("V11 2月台") ? "勤務交接" : "換端"; curPt = { loc: leg.f, report: `已完成${act}，接收建議路徑${r}，確認前方號誌開通，依時刻表${runningTime}發車`, _isChangeEnd: true }; }
     } else { curPt = { loc: leg.f, report: `已完成換端，接收建議路徑${r}，確認前方號誌開通，依時刻表${runningTime}發車`, _isChangeEnd: true }; }
@@ -743,6 +750,19 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
         persistentFault.subtype = type;
         // 煞車一律站間發生 → 用站間 loc（不用月台）
         pts.push({ loc: getAdjacentFaultLocation(leg.f, leg.t), _isBrakeScenario: true, _brakeType: type, _bogies: bogies, _isBlue: isBlue, _uplink: uplink, faultKey: 'fault_brake' });
+      } else if (fKey === 'fault_traction_tcu') {
+        // T字燈號消失(TCU離線)：隨機熄 1～2 顆 T 燈（動力轉向架僅 M1/M5，各 2 顆）；三種情形均做
+        const variant = ['one','same','cross'][Math.floor(Math.random()*3)];
+        const bog = Math.random() < 0.5 ? 'm1' : 'm5';
+        let tLights, tDesc;
+        if (variant === 'one') { tLights = [`t-${bog}-${Math.random()<0.5?1:2}`]; tDesc = `${bog.toUpperCase()}轉向架少一顆T燈`; }
+        else if (variant === 'same') { tLights = [`t-${bog}-1`, `t-${bog}-2`]; tDesc = `${bog.toUpperCase()}轉向架兩顆T燈消失`; }
+        else { tLights = [`t-m1-${Math.random()<0.5?1:2}`, `t-m5-${Math.random()<0.5?1:2}`]; tDesc = `M1、M5轉向架各少一顆T燈`; }
+        persistentFault.subtype = 'tcu';
+        persistentFault.tLights = tLights;
+        const uplink = leg.t.includes('V11') || leg.t.includes('V26');
+        // 一律站間發生 → 用站間 loc
+        pts.push({ loc: getAdjacentFaultLocation(leg.f, leg.t), _isTcuScenario: true, _tDesc: tDesc, _isBlue: isBlue, _uplink: uplink, faultKey: 'fault_traction_tcu' });
       } else {
         const fd = FAULT_DATA[fKey];
         const uplink = leg.t.includes('V11') || leg.t.includes('V26');
@@ -814,29 +834,31 @@ function buildRedlightChunks(trainId, cur) {
 }
 
 // 重開機/故排恢復後的收車尾段（所有故排共用；收車點只有 V11綠→2-0、V26藍→換藍備）
-function buildPickupChunks(t, isBlue) {
+function buildPickupChunks(t, isBlue, fkOverride) {
+  // fkOverride：收車途中 CMS 仍要顯示故障時傳入該情境 faultKey（如 TCU 上行未重開機、圖示持續離線）；預設 'recovered'
+  const fk = fkOverride || 'recovered';
   const chunks = [];
   if (isBlue) {
     // 藍線：無清除路徑步驟（目的地本就是 V26 1月台）；V26 1月台清車換端「故障車停此」→ 轉乘 V26 2月台藍海備用車
-    chunks.push({ title: '【收車】V26清車換端', faultKey: 'recovered', lines: [
+    chunks.push({ title: '【收車】V26清車換端', faultKey: fk, lines: [
       { who: 'OCC', text: `OCC呼叫${t}車，請${t}車稍後抵達V26 1月台執行清車換端，完成後回報，OVER` },
       { who: '司機員', text: `V26 1月台，${t}車呼叫OCC，已完成清車換端，清車人數0人，OVER` },
     ]});
-    chunks.push({ title: '【收車】轉乘藍海備用車', faultKey: 'recovered', isFinal: true, lines: [
+    chunks.push({ title: '【收車】轉乘藍海備用車', faultKey: fk, isFinal: true, lines: [
       { who: 'OCC', text: `OCC收到，請${t}車攜帶原車裝備至V26 2月台藍海備用車，開啟載客模式後回報，OVER` },
       { who: '司機員', text: `V26 2月台，${t}車呼叫OCC，已攜帶原車裝備至藍海備用車並開啟載客模式，通話完畢。` },
     ]});
   } else {
     // 綠線：V10 1月台手動清除路徑 → 變更目的地 V11 2月台執行清車 → 臨時駐車位置 2-0 交接
-    chunks.push({ title: '【收車】手動清除路徑', faultKey: 'recovered', lines: [
+    chunks.push({ title: '【收車】手動清除路徑', faultKey: fk, lines: [
       { who: 'OCC', text: `OCC呼叫${t}車，請${t}車行駛至V10 1月台，抵達後手動清除路徑回報，OVER` },
       { who: '司機員', text: `V10 1月台，${t}車呼叫OCC，已完成手動清除路徑，OVER` },
     ]});
-    chunks.push({ title: '【收車】變更目的地・清車', faultKey: 'recovered', lines: [
+    chunks.push({ title: '【收車】變更目的地・清車', faultKey: fk, lines: [
       { who: 'OCC', text: `OCC收到，請${t}車變更目的地為V11 2月台，抵達後執行清車，完成後回報，OVER` },
       { who: '司機員', text: `V11 2月台，${t}車呼叫OCC，已完成清車，清車人數0人，OVER` },
     ]});
-    chunks.push({ title: '【收車】勤務交接', faultKey: 'recovered', isFinal: true, lines: [
+    chunks.push({ title: '【收車】勤務交接', faultKey: fk, isFinal: true, lines: [
       { who: 'OCC', text: `OCC收到，請${t}車確認前方號誌開通後，行駛至臨時駐車位置2-0完成勤務交接後回報，OVER` },
       { who: '司機員', text: `臨時駐車位置2-0，${t}車呼叫OCC，已完成勤務交接，通話完畢。` },
     ]});
@@ -960,6 +982,44 @@ function buildBrakeChunks(trainId, cur) {
   return chunks;
 }
 
+// 牽引-CMS T字燈號消失(TCU離線)：2026-07-10 定稿。TCU錯誤復位→可移動惟圖示仍離線→煞車ERR同款「未就地重開機型」收車
+// （下行：V02 2月台→V01 清車不載客重開機→發車→收車尾段；上行：不重開機直接收車尾段、T 燈全程維持熄滅）
+function buildTcuChunks(trainId, cur) {
+  const t = trainId, loc = cur.loc, fk = 'fault_traction_tcu';
+  const isBlue = cur._isBlue;
+  const downlink = !cur._uplink; // 下行＝往 V01
+  const chunks = [];
+  chunks.push({ title: '【故排】牽引-T字燈號消失 TCU錯誤復位', faultKey: fk, requireAction: 'TCU錯誤復位', lines: [
+    { who: '司機員', text: `${loc}，${t}車呼叫OCC，CMS首頁${cur._tDesc}，已確認TCMS未亮紅燈，列車無法移動，OVER` },
+    { who: 'OCC', text: `OCC收到，${t}車，請執行CMS「TCU錯誤復位」作業，確認牽引是否恢復，OVER` },
+    { who: '司機員', text: `${t}車收到，執行CMS「TCU錯誤復位」作業，通話完畢。` },
+  ]});
+  if (downlink) {
+    chunks.push({ title: '【故排】復位後回報 續行V02', faultKey: fk, requireAction: null, lines: [
+      { who: '司機員', text: `${t}車回報，已執行TCU錯誤復位，列車恢復可移動，惟牽引圖示仍離線，OVER` },
+      { who: 'OCC', text: `OCC收到，請${t}車繼續行駛，抵達V02 2月台回報，OVER` },
+      { who: '司機員', text: `${t}車收到，繼續行駛抵達V02 2月台回報，通話完畢。` },
+    ]});
+    chunks.push({ title: '【故排】下行 V01清車不載客重開機', faultKey: fk, requireAction: null, lines: [
+      { who: '司機員', text: `V02 2月台，${t}車呼叫OCC，已抵達，OVER` },
+      { who: 'OCC', text: `OCC收到，請${t}車抵達V01後執行清車不載客重開機作業，完成後回報，OVER` },
+      { who: '司機員', text: `${t}車收到，抵達V01後執行清車不載客重開機作業，通話完畢。` },
+    ]});
+    chunks.push({ title: '【故排】下行 重開機恢復・發車', faultKey: 'recovered', requireAction: null, lines: [
+      { who: '司機員', text: `V01，${t}車呼叫OCC，已完成清車不載客重開機，列車恢復正常，OVER` },
+      { who: 'OCC', text: `OCC收到，請${t}車確認前方號誌開通後依時刻表發車，續行收車，OVER` },
+    ]});
+    buildPickupChunks(t, isBlue).forEach(c => chunks.push(c));
+  } else {
+    // 上行：不重開機，直接收車尾段；牽引圖示持續離線（收車段 faultKey 沿用本情境）
+    chunks.push({ title: '【故排】復位後回報 續行收車', faultKey: fk, requireAction: null, lines: [
+      { who: '司機員', text: `${t}車回報，已執行TCU錯誤復位，列車恢復可移動，惟牽引圖示仍離線，OVER` },
+    ]});
+    buildPickupChunks(t, isBlue, fk).forEach(c => chunks.push(c));
+  }
+  return chunks;
+}
+
 function makeChunks(trainId, pts) {
   const chunks = [];
   pts.forEach((cur, i) => {
@@ -988,10 +1048,27 @@ function makeChunks(trainId, pts) {
       buildV380Chunks(trainId, cur).forEach(c => chunks.push(c));
     } else if (cur._isBrakeScenario) {
       buildBrakeChunks(trainId, cur).forEach(c => chunks.push(c));
+    } else if (cur._isTcuScenario) {
+      buildTcuChunks(trainId, cur).forEach(c => chunks.push(c));
+    } else if (cur._isBackupDeparture) {
+      // 備用車自臨時駐車位置出發（2026-07-10 使用者定稿）：OCC 指示開空調照明→V11 授權載客；OCC 講「接收建議路徑」不帶號、司機員回報帶實際路徑號
+      const p = cur._platform, rn = cur._routeNo, tm = cur._depTime;
+      chunks.push({ title: "【起始】臨時駐車位置出發", lines: [
+        { who: "司機員", text: `${cur.loc}，${trainId}車呼叫OCC，${cur.report}，OVER` },
+        { who: "OCC", text: `OCC收到，${trainId}車，請開啟客室空調及照明，關閉不載客文字訊息，將列車行駛至V11第${p}月台後，授權月台側車門執行載客，接收建議路徑確認前方號誌開通後，依時刻表發車，OVER` },
+        { who: "司機員", text: `${trainId}車收到，開啟客室空調及照明，關閉不載客文字訊息，行駛至V11第${p}月台授權月台側車門執行載客，接收建議路徑確認前方號誌開通後依時刻表發車，通話完畢。` },
+      ]});
+      chunks.push({ title: "【起始】V11 授權載客發車", lines: [
+        { who: "司機員", text: `${trainId}車呼叫OCC，列車已抵達V11第${p}月台，並授權月台側車門執行載客，接收建議路徑${rn}，確認前方號誌開通，依時刻表${tm}發車，OVER` },
+        { who: "OCC", text: `OCC收到，${trainId}車回報，列車已抵達V11第${p}月台，並授權月台側車門執行載客，接收建議路徑${rn}，確認前方號誌開通，請依時刻表發車，通話完畢。` },
+      ]});
     } else if (cur._isFaultScenario) {
       const mc = cur._elevated ? '並切換機廠模式' : ''; // {MC}：高架段才帶入
+      // 寫死規則（2026-07-10 使用者訂）：這三顆應急按鈕在高架段一律帶「並切換機廠模式」，適用所有情境
+      const MC_BUTTONS = ['降級模式', '列車自動保護 Bypass', '上下車門'];
       cur.steps.forEach((s, idx) => {
         const rep = (s.report || '').replace(/\{MC\}/g, mc);
+        const autoMC = s.type !== 'cms' && MC_BUTTONS.includes(s.action);
         // type:'report'＝後續回報（不帶位置前綴）；其餘為含位置的初報/呼叫
         const call = s.type === 'report' ? `${trainId}車回報，${rep}，OVER` : `${cur.loc}，${trainId}車呼叫OCC，${rep}，OVER`;
         if (s.type === "final") {
@@ -999,9 +1076,9 @@ function makeChunks(trainId, pts) {
           const reply = `OCC收到，${trainId}車回報，${rep.replace(/。請問.*$/,"")}，准許${trainId}車發車回報之要求，通話完畢。`;
           chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }], requireAction: null, faultKey: cur.faultKey, isFinal: true });
         } else {
-          const act = s.type === 'cms' ? `執行CMS「${s.action}」作業` : s.action ? `按壓應急按鈕「${s.action}」${s.mcMode ? mc : ''}` : '';
-          const reply = s.occ ? `OCC收到，${trainId}車，${s.occ}，OVER` : `OCC收到，${trainId}車，請${act}，確認列車是否恢復，OVER`;
-          const repeat = s.echo ? `${trainId}車收到，${s.echo}，通話完畢。` : `${trainId}車收到，${act}，通話完畢。`;
+          const act = s.type === 'cms' ? `執行CMS「${s.action}」作業` : s.action ? `按壓應急按鈕「${s.action}」${(s.mcMode || autoMC) ? mc : ''}` : '';
+          const reply = s.occ ? `OCC收到，${trainId}車，${s.occ.replace(/\{MC\}/g, mc)}，OVER` : `OCC收到，${trainId}車，請${act}，確認列車是否恢復，OVER`;
+          const repeat = s.echo ? `${trainId}車收到，${s.echo.replace(/\{MC\}/g, mc)}，通話完畢。` : `${trainId}車收到，${act}，通話完畢。`;
           chunks.push({ title: `【故排】${cur.faultName} - 步驟 ${idx+1}`, lines: [{ who: "司機員", text: call }, { who: "OCC", text: reply }, { who: "司機員", text: repeat }], requireAction: s.action || null, faultKey: cur.faultKey });
         }
       });
@@ -1071,13 +1148,20 @@ function render() {
   const nb = document.getElementById("nextBtn"); if(nb) nb.onclick = () => { revealed++; render(); window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'}); };
 }
 
-const fA_el = document.getElementById("fromArea"); const fD_el = document.getElementById("fromDetail");
-const tA_el = document.getElementById("toArea"); const tD_el = document.getElementById("toDetail");
-const fill = (sel, keys) => sel.innerHTML = keys.map(k => `<option value="${k}">${AREAS[k].label}</option>`).join("");
-const fillD = (sel, area) => sel.innerHTML = AREAS[area].items.map(v => `<option value="${v}">${v}</option>`).join("");
-fill(fA_el, ["mainline", "blue"]); fill(tA_el, ["mainline", "green", "blue", "depot"]);
-fillD(fD_el, fA_el.value); fillD(tD_el, tA_el.value);
-fA_el.onchange = () => fillD(fD_el, fA_el.value); tA_el.onchange = () => fillD(tD_el, tA_el.value);
+// 起訖車站不分區（2026-07-10 使用者指示）：單一下拉直接列出起迄點，optgroup 僅視覺分組
+const fD_el = document.getElementById("fromDetail");
+const tD_el = document.getElementById("toDetail");
+const buildOpts = groups => groups.map(([label, items]) => `<optgroup label="${label}">` + items.map(v => `<option value="${v}">${v}</option>`).join("") + `</optgroup>`).join("");
+fD_el.innerHTML = buildOpts([
+  ["駐車", ["臨時駐車位置 1-0", "臨時駐車位置 2-0"]],
+  ["綠山線", ["V11 1月台", "V11 2月台", "V01 1月台", "V01 2月台"]],
+  ["藍海線", AREAS.blue.items],
+]);
+tD_el.innerHTML = buildOpts([
+  ["駐車/機廠", AREAS.depot.items],
+  ["綠山線", AREAS.green.items],
+  ["藍海線", AREAS.blue.items],
+]);
 
 // 視窗比 CMS 設計寬度(640)窄時（手機），整個 CMS 等比例縮小以完整顯示、不裁切；桌機維持原寸置中
 function fitCMS() {
@@ -1102,7 +1186,10 @@ document.getElementById("genBtn").onclick = () => {
   completedActions.clear();
   activeEmergencyButtons.clear(); // 每次重新產生情境，清空應急按鈕狀態
   resetFaultState(false);
-  currentChunks = makeChunks(tId, buildPoints(fA_el.value, fD_el.value, tA_el.value, tD_el.value, depTime, scenario, document.getElementById("endAction").value));
+  // 區別由起迄點字串推導（選單已不分區）：轉換軌/臨時駐車位置＝機廠性質，其餘＝正線
+  const fArea = fD_el.value.includes("轉換軌") ? "depot" : "mainline";
+  const tArea = (tD_el.value.includes("臨時駐車位置") || tD_el.value.includes("轉換軌")) ? "depot" : "mainline";
+  currentChunks = makeChunks(tId, buildPoints(fArea, fD_el.value, tArea, tD_el.value, depTime, scenario, document.getElementById("endAction").value));
   revealed = 1; render();
 };
 </script>
