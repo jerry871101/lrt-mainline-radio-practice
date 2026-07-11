@@ -237,7 +237,7 @@
       <div><label>練習情境</label><select id="scenario">
         <option value="normal">正常運轉</option><option value="random_fault">隨機故障排除 (故排)</option><option value="clear">異常處理 (清車)</option><option value="delay_intersection">未能通過路口 (紅燈)</option>
         <optgroup label="故障排除 (故排)">
-          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_power">供電-CMS 380V跳脫(集電弓)</option><option value="fault_door">車門-一組以上車門故障</option><option value="fault_speed">ATP-超速導致EB作動</option><option value="fault_ac">空調-一組以上未啟動</option><option value="fault_traction_bypass">牽引-T字亮未紅燈(Bypass)</option><option value="fault_eb12">列車操作-EB1/2作動</option><option value="fault_eb3">列車操作-EB3作動</option><option value="fault_ac_2plus">空調-二組以上未啟動</option><option value="fault_atp_readerr">ATP-讀取錯誤導致EB作動</option><option value="fault_atp_asae">ATP-AS/AE煞車圖示</option><option value="fault_atp_flat">ATP-平面段故障</option><option value="fault_e1">煞車-首頁E1圖示(無Err/Se)</option><option value="fault_ee">煞車-首頁EE圖示</option><option value="fault_door_noauth">車門-無法授權</option><option value="fault_panto_up">供電-集電弓無法上升</option><option value="fault_panto_down">供電-集電弓無法下降</option><option value="fault_panto_stuck">供電-架空線斷電仍升弓</option><option value="fault_24v_1">供電-24V離線(一組)</option><option value="fault_24v_2">供電-24V離線(兩組)</option><option value="fault_24v_immobile">供電-24V離線(不可移動)</option><option value="fault_restart">清車重開機</option>
+          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_power">供電-CMS 380V跳脫(集電弓)</option><option value="fault_door">車門-一組以上車門故障</option><option value="fault_speed">ATP-超速導致EB作動</option><option value="fault_ac">空調-一組壓縮機未做動</option><option value="fault_traction_bypass">牽引-T字亮未紅燈(Bypass)</option><option value="fault_eb12">列車操作-EB1/2作動</option><option value="fault_eb3">列車操作-EB3作動</option><option value="fault_ac_2plus">空調-二組以上未啟動</option><option value="fault_atp_readerr">ATP-讀取錯誤導致EB作動</option><option value="fault_atp_asae">ATP-AS/AE煞車圖示</option><option value="fault_atp_flat">ATP-平面段故障</option><option value="fault_e1">煞車-首頁E1圖示(無Err/Se)</option><option value="fault_ee">煞車-首頁EE圖示</option><option value="fault_door_noauth">車門-無法授權</option><option value="fault_panto_up">供電-集電弓無法上升</option><option value="fault_panto_down">供電-集電弓無法下降</option><option value="fault_panto_stuck">供電-架空線斷電仍升弓</option><option value="fault_24v_1">供電-24V離線(一組)</option><option value="fault_24v_2">供電-24V離線(兩組)</option><option value="fault_24v_immobile">供電-24V離線(不可移動)</option><option value="fault_restart">清車重開機</option>
         </optgroup>
         <optgroup label="營運情境">
           <option value="scenario_point">轉轍器手動扳轉</option><option value="scenario_pei">PEI 旅客對講機</option>
@@ -339,9 +339,11 @@ const FAULT_DATA = {
     { type: "cms", action: "ATP重置", report: "ATP及CMS人機介面顯示超速造成EB1/2作動，已將主控制器移至停機檔位並放開DSD，列車無法移動" },
     { type: "emergency", action: "列車自動保護 Bypass", report: "ATP重置及Key Off/On均無效，列車仍無法移動" }
   ]},
-  fault_ac: { name: "空調-一組以上未啟動", ending: "observe", recoverReport: "已執行CMS空調關閉10秒再開啟，空調恢復正常", steps: [
-    { type: "cms", action: "空調重置", report: "CMS空調頁面顯示一組以上空調未啟動，已確認溫度設定與自動模式正常" },
-    { type: "cms", action: "TCU錯誤復位", report: "空調重置後仍未恢復" }
+  // 空調-一組：2026-07-11 校對定稿。術語＝「壓縮機未做動、風扇有做動」（現場講法）；行控第一步先關空調十秒（純報話）→ 空調重置 → TCU復位 → 觀察型收尾。初報不帶「列車無法移動」（不影響行駛，通則例外）
+  fault_ac: { name: "空調-一組壓縮機未做動", ending: "observe", recoverReport: "已執行TCU錯誤復位，空調壓縮機恢復做動，空調恢復正常", steps: [
+    { type: "call", report: "CMS空調頁面顯示一組空調壓縮機未做動，風扇有做動，已確認溫度設定與自動模式正常", occ: "請關閉空調十秒鐘後再開啟，確認壓縮機是否恢復做動後回報", echo: "關閉空調十秒鐘後再開啟，確認壓縮機是否恢復做動後回報" },
+    { type: "report", report: "已執行空調關閉十秒再開啟，壓縮機仍未做動", action: "空調重置", occ: "請執行CMS「空調重置」作業，確認空調是否恢復", echo: "執行CMS「空調重置」作業" },
+    { type: "report", report: "已執行空調重置，壓縮機仍未做動", action: "TCU錯誤復位", occ: "請執行CMS「TCU錯誤復位」作業，確認空調是否恢復", echo: "執行CMS「TCU錯誤復位」作業" }
   ]},
   // 批次 2（2026-07-07）A類草稿，待使用者逐項校對
   // 牽引-T字亮未紅燈(Bypass)：2026-07-08 使用者逐句定稿。{MC}＝高架段(V01–V07)才帶入「並切換機廠模式」
@@ -349,12 +351,16 @@ const FAULT_DATA = {
     { type: "emergency", action: "列車自動保護 Bypass", mcMode: true, report: "CMS首頁T字燈號有亮起、總故障燈未亮紅燈，主控制器無法出力，列車無牽引動力、無法移動" },
     { type: "report", report: "已按壓應急按鈕「列車自動保護 Bypass」{MC}仍無效，列車無法移動", occ: "請播放預錄廣播告知旅客相關資訊後，復歸應急按鈕並執行降弓重開機", echo: "播放預錄廣播後復歸應急按鈕並執行降弓重開機" }
   ]},
-  fault_eb12: { name: "列車操作-EB1/2作動", ending: "restart", recoverReport: "按降級模式＋機廠模式（需行控授權）重複操作仍無效，已執行降弓重開機，列車恢復正常", steps: [
-    { type: "emergency", action: "降級模式", report: "列車倒滑導致EB1/2作動，已將主控制器移至停機檔位、放開DSD再回煞車檔位並重複四至五次，仍無牽引動力，列車無法移動" }
+  // 列車操作-EB1/2(倒滑)：2026-07-11 校對定稿。結構同 EE；「能移動→下游站復歸」分支不做；客室把手/緊急開門版屬客室動作（C類擱置）
+  fault_eb12: { name: "列車操作-EB1/2作動", ending: "restart", recoverReport: "已完成降弓重開機，列車恢復正常、可移動", steps: [
+    { type: "call", report: "列車倒滑導致EB1/2作動，已將主控制器移至停機檔位、放開DSD再回煞車檔位並重複四至五次，仍無牽引動力，列車無法移動", action: "降級模式", occ: "請按壓應急按鈕「降級模式」{MC}，嘗試移動列車", echo: "按壓應急按鈕「降級模式」{MC}" },
+    { type: "report", report: "已按壓應急按鈕「降級模式」{MC}仍無效，列車無法移動", occ: "請播放預錄廣播告知旅客相關資訊後，復歸應急按鈕並執行降弓重開機", echo: "播放預錄廣播後復歸應急按鈕並執行降弓重開機" }
   ]},
-  fault_eb3: { name: "列車操作-EB3作動", ending: "restart", recoverReport: "按降級模式＋機廠模式（需行控授權）仍無效，已執行降弓重開機，列車恢復正常", steps: [
-    { type: "cms", action: "TCU錯誤復位", report: "主控制器誤移至緊急煞車EB3檔位造成EB3作動，已確認集電弓、供電、電壓、空調狀態，並將主控制器移回煞車檔位，仍無牽引動力，列車無法移動" },
-    { type: "emergency", action: "降級模式", report: "TCU復位後仍無牽引動力" }
+  // 列車操作-EB3：2026-07-11 校對定稿。初報「稍早列車誤拉至EB3」（使用者原話）；TCU復位→降級模式{MC}→降弓重開機；「能移動」分支不做
+  fault_eb3: { name: "列車操作-EB3作動", ending: "restart", recoverReport: "已完成降弓重開機，列車恢復正常、可移動", steps: [
+    { type: "cms", action: "TCU錯誤復位", report: "稍早列車誤拉至EB3，已確認集電弓、供電、電壓及空調狀態正常，並將主控制器移至停機檔位放開DSD再回煞車檔位，仍無牽引動力，列車無法移動" },
+    { type: "report", report: "已執行TCU錯誤復位，仍無牽引動力，列車無法移動", action: "降級模式", occ: "請按壓應急按鈕「降級模式」{MC}，嘗試移動列車", echo: "按壓應急按鈕「降級模式」{MC}" },
+    { type: "report", report: "已按壓應急按鈕「降級模式」{MC}仍無效，列車無法移動", occ: "請播放預錄廣播告知旅客相關資訊後，復歸應急按鈕並執行降弓重開機", echo: "播放預錄廣播後復歸應急按鈕並執行降弓重開機" }
   ]},
   // 批次 3（2026-07-07）A/B類草稿，待使用者逐項校對（CMS 尚未加對應視覺；收車一律通用收車）
   fault_ac_2plus: { name: "空調-二組以上未啟動", ending: "restart", recoverReport: "已確認兩端「空調關閉」應急按鈕復歸仍無效，執行降弓重開機空調仍未恢復，續行收車", steps: [
@@ -378,8 +384,10 @@ const FAULT_DATA = {
     { type: "report", report: "TCMS內BCU未亮紅燈", action: "降級模式", occ: "請按壓應急按鈕「降級模式」{MC}，嘗試移動列車", echo: "按壓應急按鈕「降級模式」{MC}" },
     { type: "report", report: "已按壓應急按鈕「降級模式」{MC}仍無效，列車無法移動", occ: "請播放預錄廣播告知旅客相關資訊後，復歸應急按鈕並執行降弓重開機", echo: "播放預錄廣播後復歸應急按鈕並執行降弓重開機" }
   ]},
-  fault_ee: { name: "煞車-首頁EE圖示", ending: "restart", recoverReport: "按降級模式＋機廠模式仍無效，已執行降弓重開機，列車恢復正常", steps: [
-    { type: "emergency", action: "降級模式", report: "CMS首頁出現EE煞車圖示、總故障燈亮紅燈列車無法啟動，已將主控制器壓著DSD推到底3至5秒再拉回停機檔並重複四至五次，仍無牽引動力，列車無法移動" }
+  // 煞車-首頁EE：2026-07-11 校對定稿。結構同 E1 減 BCU 步驟；「若能移動→下游站復歸」分支不做（與 §3.4 重複）
+  fault_ee: { name: "煞車-首頁EE圖示", ending: "restart", recoverReport: "已完成降弓重開機，列車恢復正常、可移動", steps: [
+    { type: "call", report: "CMS首頁出現EE煞車圖示，總故障燈亮紅燈、列車無法啟動，已將主控制器壓著DSD推到底3至5秒再拉回停機檔位並重複四至五次，仍無牽引動力，列車無法移動", action: "降級模式", occ: "請按壓應急按鈕「降級模式」{MC}，嘗試移動列車", echo: "按壓應急按鈕「降級模式」{MC}" },
+    { type: "report", report: "已按壓應急按鈕「降級模式」{MC}仍無效，列車無法移動", occ: "請播放預錄廣播告知旅客相關資訊後，復歸應急按鈕並執行降弓重開機", echo: "播放預錄廣播後復歸應急按鈕並執行降弓重開機" }
   ]},
   fault_door_noauth: { name: "車門-無法授權", ending: "observe", recoverReport: "按壓零速度後釋放開門訊號仍無效，經OCC授權操作「第一道車門」供旅客上下車", steps: [
     { type: "cms", action: "車門全開全關", report: "CMS首頁車門圖示不正常、車門無法授權，列車停於月台、月台側開門，經行控授權執行全部開門開關一次" },
@@ -811,11 +819,12 @@ function buildRedlightChunks(trainId, cur) {
       { who: '司機員', text: `${t}車收到，執行清車重開機，通話完畢。` },
     ]});
   } else {
-    // 分支乙：路口/站間 → 降級模式移動至下游站
+    // 分支乙：路口/站間 → 降級模式移動至下游站（高架段依報話通用規則 §1.3 帶「並切換機廠模式」，2026-07-11 補）
+    const mc = isElevatedLoc(loc) ? '並切換機廠模式' : '';
     chunks.push({ title: '【故排】站間處置 - 步驟2 降級模式移動至下游站', faultKey: fk, requireAction: '降級模式', lines: [
       { who: '司機員', text: `${t}車回報，TCU復位無效，列車位於站間無法開門確認，仍無牽引動力，OVER` },
-      { who: 'OCC', text: `OCC收到，請${t}車按壓應急按鈕「降級模式」，將列車移動至下游${downstream}，抵達後回報，OVER` },
-      { who: '司機員', text: `${t}車收到，按壓應急按鈕「降級模式」移動至下游${downstream}，抵達後回報，通話完畢。` },
+      { who: 'OCC', text: `OCC收到，請${t}車按壓應急按鈕「降級模式」${mc}，將列車移動至下游${downstream}，抵達後回報，OVER` },
+      { who: '司機員', text: `${t}車收到，按壓應急按鈕「降級模式」${mc}移動至下游${downstream}，抵達後回報，通話完畢。` },
     ]});
     chunks.push({ title: '【故排】站間處置 - 步驟3 OCC下達清車重開機', faultKey: fk, requireAction: null, lines: [
       { who: '司機員', text: `${t}車回報，已以降級模式行駛至${downstream}，OVER` },
