@@ -270,7 +270,7 @@
       <div><label>練習情境</label><select id="scenario">
         <option value="normal">正常運轉</option><option value="random_fault">隨機故障排除 (故排)</option><option value="clear">異常處理 (清車)</option><option value="delay_intersection">未能通過路口 (紅燈)</option>
         <optgroup label="故障排除 (故排)">
-          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_door">車門-一組以上車門故障</option><option value="fault_speed">ATP-超速導致EB作動</option><option value="fault_ac">空調-一組壓縮機未做動</option><option value="fault_traction_bypass">牽引-T字亮未紅燈(Bypass)</option><option value="fault_eb12">列車操作-EB1/2作動</option><option value="fault_eb3">列車操作-EB3作動</option><option value="fault_ac_2plus">空調-二組以上壓縮機未做動</option><option value="fault_atp_asae">ATP-AS/AE煞車圖示</option><option value="fault_e1">煞車-首頁E1圖示(無Err/Se)</option><option value="fault_ee">煞車-首頁EE圖示</option><option value="fault_door_noauth">車門-無法授權</option><option value="fault_panto_up">供電-集電弓無法上升</option><option value="fault_panto_down">供電-集電弓無法下降</option><option value="fault_panto_stuck">供電-架空線斷電仍升弓</option><option value="fault_24v_1">供電-24V離線(一組)</option><option value="fault_24v_2">供電-24V離線(兩組)</option><option value="fault_24v_immobile">供電-24V離線(不可移動)</option><option value="fault_restart">清車重開機</option>
+          <option value="fault_traction_tcu">牽引-CMS T字燈號消失(TCU離線)</option><option value="fault_traction_redlight">牽引-無牽引動力,總故障燈亮紅燈</option><option value="fault_traction_380v">牽引-380V跳脫(24V離線)</option><option value="fault_brake_err">煞車-轉向架ERR(E1,隔離)</option><option value="fault_brake_se">煞車-轉向架SE(隨機單一/全部)</option><option value="fault_brake_2plus">煞車-兩組以上ERR(降弓重開機)</option><option value="fault_door">車門-一組以上車門故障</option><option value="fault_speed">ATP-超速導致EB作動</option><option value="fault_ac">空調-一組壓縮機未做動</option><option value="fault_traction_bypass">牽引-T字亮未紅燈(Bypass)</option><option value="fault_eb12">列車操作-EB1/2作動</option><option value="fault_eb3">列車操作-EB3作動</option><option value="fault_ac_2plus">空調-二組以上壓縮機未做動</option><option value="fault_atp_asae">ATP-AS/AE煞車圖示</option><option value="fault_e1">煞車-首頁E1圖示(無Err/Se)</option><option value="fault_ee">煞車-首頁EE圖示</option><option value="fault_door_noauth">車門-無法授權</option><option value="fault_panto_up">供電-集電弓無法上升</option><option value="fault_panto_down">供電-集電弓無法下降</option><option value="fault_panto_stuck">供電-架空線斷電仍升弓</option><option value="fault_24v_1">供電-24V離線(一組)</option><option value="fault_24v_2">供電-24V離線(兩組)</option><option value="fault_24v_immobile">供電-24V離線(不可移動)</option>
         </optgroup>
         <optgroup label="營運情境">
           <option value="scenario_point">轉轍器手動扳轉</option><option value="scenario_pei">PEI 旅客對講機</option>
@@ -445,10 +445,8 @@ const FAULT_DATA = {
     { type: "report", action: "TCU錯誤復位", report: "已關閉客室空調及照明，列車仍無法移動", occ: "請執行CMS「TCU錯誤復位」作業，確認是否恢復", echo: "執行CMS「TCU錯誤復位」作業" },
     { type: "report", report: "已執行TCU錯誤復位，列車仍無法移動", occ: "請播放預錄廣播告知旅客相關資訊後，執行降弓重開機", echo: "播放預錄廣播後執行降弓重開機" }
   ]},
-  fault_restart: { name: "清車重開機", steps: [
-    { type: "emergency", action: "降級模式", report: "列車多項系統異常，請求執行清車重開機作業" },
-    { type: "final", report: "已完成清車並執行重開機作業，系統恢復正常。請問OCC是否准許跳站發車，直到時刻表回復準點為止" }
-  ]}
+  // fault_restart（清車重開機）：2026-07-14 使用者確認刪除——依 C 類決策「清車重開機不做獨立情境（為共用收車結尾）」，
+  // 正確台詞已存在於各情境收車段（TCU 收車、空調二組 V01 A步驟等）。優先2（舊式結尾）、優先3（降級模式邏輯矛盾）隨之消滅。
 };
 
 let pendingAction = null; let currentChunks = []; let revealed = 0;
@@ -721,13 +719,7 @@ function handleEmergencyClick(action) {
   if (pendingAction === action || (action === '煞車解除' && pendingAction === '隔離並煞車解除' && brakeReleaseStep === 1)) {
     activeEmergencyButtons.add(action); // 記錄已按壓的應急按鈕
     completedActions.add(revealed);
-    // 若是清車重開機按下降級模式，觸發復歸
-    if (action === '降級模式') {
-      const lastChunk = currentChunks[revealed - 1];
-      if (lastChunk && lastChunk.faultKey === 'fault_restart') {
-        resetFaultState(true); // 清車重開機：復歸所有應急按鈕
-      }
-    }
+    // 應急按鈕復歸改由 render() 在「重開機恢復」段自動觸發（2026-07-14 優先5 定案；原 fault_restart＋降級模式的舊機制已刪）
     brakeReleaseStep = 0;
     pendingAction = null;
     render();
@@ -790,7 +782,7 @@ function buildPoints(fA, fD, tA, tD, depTime, scenario, endAction) {
 
     const roll = Math.random();
     if ((scenario === "random_fault" && roll > 0.3) || (scenario.startsWith("fault_"))) {
-      const randomPool = ['fault_traction_tcu','fault_brake','fault_door','fault_speed','fault_ac','fault_traction_bypass','fault_eb12','fault_eb3','fault_ac_2plus','fault_atp_asae','fault_e1','fault_ee','fault_door_noauth','fault_panto_up','fault_panto_down','fault_panto_stuck','fault_24v_1','fault_24v_2','fault_24v_immobile','fault_restart'];
+      const randomPool = ['fault_traction_tcu','fault_brake','fault_door','fault_speed','fault_ac','fault_traction_bypass','fault_eb12','fault_eb3','fault_ac_2plus','fault_atp_asae','fault_e1','fault_ee','fault_door_noauth','fault_panto_up','fault_panto_down','fault_panto_stuck','fault_24v_1','fault_24v_2','fault_24v_immobile'];
       const fKey = scenario.startsWith("fault_") ? scenario : randomPool[Math.floor(Math.random()*randomPool.length)];
       // 隨機決定故障發生於「站內(月台)」或「站間途中」（Q2）
       const atStation = Math.random() < 0.5 && leg.t.includes("月台");
@@ -1512,6 +1504,8 @@ function render() {
   const box = document.getElementById("result"); if (currentChunks.length === 0) return;
   const lastChunk = currentChunks[revealed - 1];
   if (lastChunk && lastChunk.faultKey) updateCMSDisplay(lastChunk.faultKey);
+  // 優先5 定案（2026-07-14）：對話走到「重開機恢復」段（就地降弓／端點站清車／升弓狀態重開機）即自動復歸所有應急按鈕——重開機前按鈕皆需復歸
+  if (lastChunk && lastChunk.faultKey === 'recovered' && lastChunk.lines.some(l => l.text.includes('重開機'))) activeEmergencyButtons.clear();
   const cmsActions = ['TCU錯誤復位', '隔離轉向架', '車門全開全關', '空調重置', '後視鏡重置', 'ATP重置', '降弓', 'TCU復位並降弓', '空調關閉'];
   pendingAction = (lastChunk && !completedActions.has(revealed)) ? lastChunk.requireAction : null;
   if (pendingAction !== '車門全開全關') doorSeqStep = 0; // 離開車門步驟時重置序列
