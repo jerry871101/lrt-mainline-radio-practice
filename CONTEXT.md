@@ -15,7 +15,7 @@
 | 報話通用規則 | `報話通用規則.md`（跨情境報話慣例速查，**開工前先讀**） |
 | 正線 SOP | `MAINLINE_NOTES.md` |
 | 路線代號圖 | `路線與路口代號圖.md` |
-| 機廠規則 | `CLAUDE.md`（機廠調車版，供參考） |
+| 機廠規則 | `機廠版CLAUDE_kunpeto原始參考.md`（本專案是從 kunpeto 的機廠調車無線電練習複製修改而來，此檔是原始機廠版留供參考；2026-09-17 從 `CLAUDE.md` 改名，避免被誤認成本專案現行的 AI 指示檔） |
 | 共用知識 | `C:\Users\jerry\project\lrt-mainline-radio-practice\資料\shared_knowledge\` |
 | **故排權威依據** ⭐ | `資料\shared_knowledge\lrt-contingency-steps.md`（＋`.json`）＝「列車應變處理步驟」完整轉檔（11類別/24故障/43情境/140步驟）。**所有故排情境的台詞/流程一律以此為準**；來源 Excel＝`資料\【流程】列車應變處理步驟20230701.xlsx` |
 | 已完成情境細節 | `工作日誌封存.md`（保持本檔精簡） |
